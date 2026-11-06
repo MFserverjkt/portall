@@ -24,6 +24,7 @@ class BranchSeeder extends Seeder
             ['code' => 'MFSMB', 'name' => 'MAISON FEERIE SUMMARECON MALL BEKASI'],
 
             // Cabang SURABAYA (SBY) Terbaru
+            ['code' => 'HOTNG', 'name' => 'HEAD OFFICE TANGERANG'],
             ['code' => 'MFGM3', 'name' => 'MAISON FEERIE GALAXY MALL 3 SBY'],
             ['code' => 'MFHDH', 'name' => 'MAISON FEERIE HOKKY FRUIT DARMO HARAPAN SBY'],
             ['code' => 'MFHGF', 'name' => 'MAISON FEERIE HOKKY FRUIT GRAHA FAMILY SBY'],

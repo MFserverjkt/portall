@@ -35,8 +35,9 @@
                     placeholder="Masukkan nama pelapor / staf..." 
                     value="{{ old('reporter_name') }}" 
                     required
+                    autocomplete="off"
                 >
-                <small class="text-muted">Isi nama staf/personil yang melaporkan kendala ini.</small>
+                <small class="text-muted d-block mt-1">Isi nama staf/personil yang melaporkan kendala ini.</small>
                 @error('reporter_name')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
@@ -65,9 +66,9 @@
                     <select name="branch_code" id="branch-select" class="form-select @error('branch_code') is-invalid @enderror" required>
                         <option value="">-- Pilih Cabang / Outlet --</option>
                         @if(isset($branches) && count($branches) > 0)
-                            @foreach($branches as $code => $name)
+                            @foreach($branches as $code =>$name)
                                 <option value="{{ $code }}" {{ old('branch_code', auth()->user()->branch_code ?? '') == $code ? 'selected' : '' }}>
-                                    [{{ $code }}] {{ $name }}
+                                    [{{ $code }}] {{$name }}
                                 </option>
                             @endforeach
                         @endif
@@ -78,27 +79,44 @@
                 @enderror
             </div>
 
-            <!-- Pilih Aset Kerusakan -->
+            <!-- Pilih Aset Kerusakan (Dropdown / Scan Barcode / Input Manual) -->
             <div class="mb-3">
                 <label class="form-label fw-bold">Pilih Aset Kerusakan <span class="text-danger">*</span></label>
                 <div class="input-group">
                     <div class="flex-grow-1">
-                        <select name="asset_id" id="asset-select" class="form-select @error('asset_id') is-invalid @enderror" required>
-                            <option value="">-- Ketik / Cari Aset --</option>
-                            @forelse($assets as $asset)
-                                <option value="{{ $asset->id }}" data-code="{{ trim($asset->asset_code) }}" {{ old('asset_id') == $asset->id ? 'selected' : '' }}>
-                                    {{ trim($asset->asset_code) }} - {{ $asset->asset_name }} {{ $asset->brand ? '('.$asset->brand.')' : '' }} [{{ $asset->branch_name ?? $asset->branch_code ?? 'Semua Cabang' }}]
-                                </option>
-                            @empty
-                                <option value="" disabled>Tidak ada data aset terdaftar dalam sistem</option>
-                            @endforelse
+                        <select name="asset_id" id="asset-select" class="form-select @error('asset_id') is-invalid @enderror">
+                            <option value="">-- Ketik / Cari Aset dari Daftar --</option>
+                            @if(isset($assets) && count($assets) > 0)
+                                @foreach($assets as $asset)
+                                    <option value="{{ $asset->id }}" data-code="{{ trim($asset->asset_code) }}" {{ old('asset_id') == $asset->id ? 'selected' : '' }}>
+                                        {{ trim($asset->asset_code) }} - {{$asset->asset_name }} {{ $asset->brand ? '('.$asset->brand.')' : '' }} [{{ $asset->branch_name ?? $asset->branch_code ?? 'Semua Cabang' }}]
+                                    </option>
+                                @endforeach
+                            @endif
                         </select>
                     </div>
-                    <button type="button" class="btn btn-primary fw-bold" id="btn-scan-barcode" data-bs-toggle="modal" data-bs-target="#barcodeModal" style="z-index: 100;">
+                    <button type="button" class="btn btn-primary fw-bold px-3" id="btn-scan-barcode" data-bs-toggle="modal" data-bs-target="#barcodeModal">
                         📷 SCAN BARCODE
                     </button>
                 </div>
+                
+                <!-- Input Teks Manual Jika Aset Tidak Terdaftar -->
+                <div class="mt-2">
+                    <label for="custom_asset_name" class="form-label small text-muted mb-1">Atau Ketik Nama Aset Manual (Jika tidak ada di daftar):</label>
+                    <input 
+                        type="text" 
+                        name="custom_asset_name" 
+                        id="custom_asset_name" 
+                        class="form-control form-control-sm @error('custom_asset_name') is-invalid @enderror" 
+                        placeholder="Contoh: Mesin Kasir / Printer Kasir Manual"
+                        value="{{ old('custom_asset_name') }}"
+                    >
+                </div>
+
                 @error('asset_id')
+                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                @enderror
+                @error('custom_asset_name')
                     <div class="invalid-feedback d-block">{{ $message }}</div>
                 @enderror
             </div>
@@ -191,6 +209,19 @@
             width: '100%'
         });
 
+        // Kosongkan input manual jika dropdown dipilih, dan sebaliknya
+        $('#asset-select').on('change', function() {
+            if ($(this).val()) {
+                $('#custom_asset_name').val('');
+            }
+        });
+
+        $('#custom_asset_name').on('input', function() {
+            if ($(this).val().trim() !== '') {
+                $('#asset-select').val(null).trigger('change');
+            }
+        });
+
         // Inisialisasi Select2 Cabang jika berupa element <select>
         if ($('#branch-select').is('select')) {
             $('#branch-select').select2({
@@ -199,7 +230,7 @@
                 width: '100%'
             });
 
-            // Filter aset otomatis secara Ajax saat cabang diganti (opsional/fleksibel)
+            // Filter aset otomatis secara Ajax saat cabang diganti
             $('#branch-select').on('change', function() {
                 let branchCode = $(this).val();
                 if (!branchCode) return;
@@ -211,7 +242,9 @@
                     dataType: "html",
                     success: function(response) {
                         let newAssets = $(response).find('#asset-select').html();
-                        $('#asset-select').html(newAssets).trigger('change');
+                        if (newAssets) {
+                            $('#asset-select').html(newAssets).trigger('change');
+                        }
                     }
                 });
             });
@@ -301,6 +334,7 @@
 
         function applyMatchedAsset(assetId) {
             $('#asset-select').val(assetId).trigger('change');
+            $('#custom_asset_name').val(''); // Kosongkan input manual jika hasil scan ketemu
             if (html5QrCode) {
                 html5QrCode.stop().then(() => {
                     $('#barcodeModal').modal('hide');
@@ -315,7 +349,8 @@
 </script>
 
 <style>
-    .select2-container .select2-selection--single {
+    /* Styling agar Select2 menyatu rapi dengan tombol SCAN BARCODE pada Input Group */
+    .input-group .select2-container--default .select2-selection--single {
         height: 38px !important;
         border: 1px solid #dee2e6 !important;
         border-top-right-radius: 0 !important;
@@ -327,6 +362,11 @@
     }
     .select2-container--default .select2-selection--single .select2-selection__arrow {
         height: 36px !important;
+    }
+    .input-group > .btn-primary {
+        border-top-left-radius: 0 !important;
+        border-bottom-left-radius: 0 !important;
+        z-index: 2 !important;
     }
 </style>
 @endsection

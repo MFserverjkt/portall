@@ -9,6 +9,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\HcLearningController;
 use App\Http\Controllers\GuidanceController;
 use App\Http\Controllers\ChecklistOutletController;
+use App\Http\Controllers\AssetManagementController;
 
 // Import Controller untuk Telegram Bot SDK
 use Telegram\Bot\Laravel\Facades\Telegram;
@@ -37,10 +38,8 @@ Route::controller(AuthController::class)->group(function () {
 // TELEGRAM BOT ROUTES (Publik / Webhook)
 // ==========================================
 
-// Route untuk uji coba kirim pesan Telegram dari browser
 Route::get('/test-telegram', function () {
     try {
-        // Ganti dengan Chat ID Telegram Anda (atau ambil dari database/config)
         $chatId = '1226395565'; 
 
         $response = Telegram::sendMessage([
@@ -54,14 +53,12 @@ Route::get('/test-telegram', function () {
     }
 });
 
-// Route untuk menerima update/pesan masuk dari Telegram (Webhook)
 Route::post('/telegram/webhook', function () {
     $update = Telegram::commandsHandler(true);
 
     $chatId = $update->getChat()->getId();
     $text = $update->getText();
 
-    // Contoh respon otomatis sederhana dari bot
     if ($text == '/start') {
         Telegram::sendMessage([
             'chat_id' => $chatId,
@@ -83,19 +80,22 @@ Route::middleware(['auth'])->group(function () {
 
     // --- FITUR PANDUAN / GUIDANCE (SEMUA ROLE) ---
     Route::get('guidance', [GuidanceController::class, 'index'])->name('guidance.index');
-    Route::get('panduan', [GuidanceController::class, 'index'])->name('panduan.index'); // Alias untuk kompatibilitas
+    Route::get('panduan', [GuidanceController::class, 'index'])->name('panduan.index');
+
+    // --- FITUR ASSET MANAGEMENT ---
+    Route::resource('asset-management', AssetManagementController::class);
+    Route::post('asset-management/{id}/user-history', [AssetManagementController::class, 'storeUserHistory'])->name('asset-management.user-history.store');
+    Route::post('asset-management/{id}/maintenance-history', [AssetManagementController::class, 'storeMaintenanceHistory'])->name('asset-management.maintenance-history.store');
 
     // --- FITUR ADMIN & IT (USER, ROLE MANAGEMENT, EXPORT EXCEL & CHECKLIST OUTLET) ---
     Route::middleware(['role:ADMIN,IT'])->group(function () {
-        // User & Role Management
         Route::controller(UserController::class)->group(function () {
-            Route::get('users/export', 'exportExcel')->name('users.export'); // Route Export Excel User
+            Route::get('users/export', 'exportExcel')->name('users.export');
             Route::get('user-roles', 'roles')->name('users.roles');
             Route::post('user-roles/update', 'updateRolePermissions')->name('users.roles.update');
             Route::resource('users', UserController::class);
         });
 
-        // Checklist Outlet IT
         Route::controller(ChecklistOutletController::class)->prefix('it')->name('it.')->group(function () {
             Route::get('checklist-outlet', 'create')->name('checklist.create');
             Route::post('checklist-outlet', 'store')->name('checklist.store');
@@ -103,46 +103,37 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // --- FITUR HC LEARNING ---
-    Route::middleware(['role:ADMIN,IT,HC,OUTLET'])->prefix('hc')->name('hc.')->controller(HcLearningController::class)->group(function () {
+    Route::middleware(['role:ADMIN,IT,HC,OUTLET'])->prefix('hc')->controller(HcLearningController::class)->group(function () {
         Route::get('e-learning', 'index')->name('elearning.index');
+        Route::get('e-learning-alt', 'index')->name('hc.elearning.index');
         
         // Pre-Test
         Route::get('pre-test', 'pretest')->name('pretest.index');
+        Route::get('pre-test-alt', 'pretest')->name('hc.pretest.index');
         Route::post('pre-test', 'storePretest')->name('pretest.store');
+        Route::post('pre-test-alt', 'storePretest')->name('hc.pretest.store');
         
         // Post-Test
         Route::get('post-test', 'posttest')->name('posttest.index');
+        Route::get('post-test-alt', 'posttest')->name('hc.posttest.index');
         Route::post('post-test', 'storePosttest')->name('posttest.store');
+        Route::post('post-test-alt', 'storePosttest')->name('hc.posttest.store');
     });
-
+    
     // --- FITUR HC RECRUITMENT & MANPOWER PLANNING ---
     Route::middleware(['role:ADMIN,IT,HC,MANAGEMENT'])->prefix('hc')->name('hc.')->group(function () {
-        // Executive Dashboard SLA
         Route::get('dashboard', [HcDashboardController::class, 'index'])->name('dashboard');
-
-        // Manpower Request & Approval Flow
         Route::resource('manpower', ManpowerRequestController::class);
-
-        // Vacancies Requisition & Recruitment Pipeline
         Route::resource('vacancies', VacancyController::class);
-
-        // Candidate Database & Tracking
         Route::resource('candidates', CandidateController::class);
-
-        // SLA Analytics & Bottleneck Report
         Route::get('reports/sla', [SlaReportController::class, 'index'])->name('reports.sla');
-
-        // Audit Trail System
         Route::get('audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
     });
 
     // --- FITUR REPORT CORRECTIVE ---
     Route::middleware(['role:ADMIN,IT,MAINTENANCE'])->prefix('report')->name('report.')->controller(ReportController::class)->group(function () {
-        // Report IT
         Route::get('it', 'reportIt')->name('it');
         Route::get('it/export', 'exportItExcel')->name('it.export');
-
-        // Report Maintenance
         Route::get('maintenance', 'reportMaintenance')->name('maintenance');
         Route::get('maintenance/export', 'exportMaintenanceExcel')->name('maintenance.export');
     });
@@ -150,7 +141,6 @@ Route::middleware(['auth'])->group(function () {
     // --- FITUR INVENTORI ASSET ---
     Route::middleware(['role:ADMIN,IT,MAINTENANCE,OUTLET'])->group(function () {
         Route::controller(AssetController::class)->group(function () {
-            // Scanner QR Code & Bulk Actions
             Route::match(['get', 'post'], 'assets/scan-check', 'scanCheck')->name('assets.scan-check');
             Route::get('assets/export', 'export')->name('assets.export');
             Route::post('assets/import', 'import')->name('assets.import');
@@ -160,27 +150,32 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('assets', AssetController::class);
     });
 
-    // --- FITUR WORK PROGRESS & BAST (ADMIN, IT, & MAINTENANCE) ---
+    // --- FITUR WORK PROGRESS & BAST ---
     Route::middleware(['role:ADMIN,IT,MAINTENANCE'])->controller(TicketController::class)->group(function () {
-        // Work Progress Update
         Route::patch('tickets/{id}/work', 'updateWork')->name('tickets.work.update');
-
-        // Pembuatan BAST & Alias
         Route::get('tickets/{id}/bast/create', 'createBast')->name('tickets.bast.create');
         Route::post('tickets/{id}/bast', 'storeBast')->name('tickets.bast.store');
-        
-        // Alias Route BAST
         Route::get('tickets/{id}/bast-create-alias', 'createBast')->name('tickets.createBast');
         Route::get('tickets/{id}/bast-create-alt', 'createBast')->name('tickets.bast_create');
         Route::post('tickets/{id}/bast-store-alias', 'storeBast')->name('tickets.storeBast');
     });
 
-    // --- FITUR TIKET (SEMUA ROLE) ---
+    // --- FITUR TIKET & DASHBOARD ---
     Route::middleware(['role:ADMIN,IT,MAINTENANCE,OUTLET'])->controller(TicketController::class)->group(function () {
+        // Dashboard Enterprise Tiket
+        Route::get('tickets/dashboard', 'dashboard')->name('tickets.dashboard');
+        
+        // Dashboard SLA & Ticket Trend Baru
+        Route::get('tickets/sla-dashboard', 'slaDashboard')->name('tickets.sla-dashboard');
+
+        // CRUD Tiket
         Route::get('tickets', 'index')->name('tickets.index');
         Route::get('tickets/create', 'create')->name('tickets.create');
         Route::post('tickets', 'store')->name('tickets.store');
         Route::get('tickets/{id}', 'show')->name('tickets.show');
+        
+        // Hapus Tiket (Khusus Admin / IT)
+        Route::delete('tickets/{id}', 'destroy')->name('tickets.destroy');
 
         // Status Done Confirmation
         Route::match(['post', 'patch'], 'tickets/{id}/done', 'markAsDone')->name('tickets.markAsDone');

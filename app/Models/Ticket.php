@@ -14,6 +14,7 @@ class Ticket extends Model
         'user_id',
         'reporter_name',
         'asset_id',
+        'custom_asset_name',
         'department',
         'title',
         'description',

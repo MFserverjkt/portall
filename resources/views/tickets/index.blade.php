@@ -8,10 +8,12 @@
     </a>
 </div>
 
-<!-- FILTER BOX BRANCH -->
+<!-- FILTER BOX (BRANCH & STATUS) -->
 <div class="card border-0 shadow-sm mb-3">
     <div class="card-body p-3">
         <form method="GET" action="{{ url()->current() }}" class="row g-2 align-items-center">
+            
+            <!-- Filter Branch / Cabang -->
             <div class="col-md-4 col-sm-6">
                 <label for="branch" class="form-label small fw-bold mb-1">Filter Branch / Cabang</label>
                 <select name="branch" id="branch" class="form-select form-select-sm" onchange="this.form.submit()">
@@ -23,8 +25,22 @@
                     @endforeach
                 </select>
             </div>
+
+            <!-- Filter Status (Terbuka, On Check, On Progress, Menunggu Konfirmasi, Completed) -->
+            <div class="col-md-4 col-sm-6">
+                <label for="status" class="form-label small fw-bold mb-1">Filter Status</label>
+                <select name="status" id="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">-- Semua Status --</option>
+                    <option value="Terbuka" {{ request('status') == 'Terbuka' ? 'selected' : '' }}>Terbuka</option>
+                    <option value="On Check" {{ request('status') == 'On Check' ? 'selected' : '' }}>On Check</option>
+                    <option value="On Progress" {{ request('status') == 'On Progress' ? 'selected' : '' }}>On Progress</option>
+                    <option value="Menunggu Konfirmasi" {{ request('status') == 'Menunggu Konfirmasi' ? 'selected' : '' }}>Menunggu Konfirmasi</option>
+                    <option value="Completed" {{ request('status') == 'Completed' ? 'selected' : '' }}>Completed</option>
+                </select>
+            </div>
             
-            @if(request('branch'))
+            <!-- Tombol Reset Filter -->
+            @if(request('branch') || request('status'))
             <div class="col-auto mt-4">
                 <a href="{{ url()->current() }}" class="btn btn-outline-secondary btn-sm">
                     <i class="bi bi-x-circle me-1"></i> Reset
@@ -81,7 +97,7 @@
                                 {{ $ticket->department }}
                             </span>
                         </td>
-                        <td>{{ $ticket->asset->asset_name ?? '-' }}</td>
+                        <td>{{ $ticket->asset->asset_name ?? $ticket->custom_asset_name ?? '-' }}</td>
                         <td>{{ $ticket->title }}</td>
                         <td>
                             @php
@@ -89,13 +105,16 @@
                                 $workStatus = $ticket->work_status ?? $ticket->status;
                                 $statusBadge = 'secondary';
 
-                                if (in_array($workStatus, ['Terbuka', 'On Check', 'Pengajuan Sparepart', 'On Progress', 'Diproses'])) {$statusBadge = 'warning text-dark';
-                                } elseif ($workStatus === 'Menunggu Konfirmasi') {$statusBadge = 'info text-dark';
-                                } elseif (in_array($workStatus, ['Completed', 'Selesai', 'Selesai (DONE)'])) {$statusBadge = 'success';
+                                if (in_array($workStatus, ['Terbuka', 'On Check', 'Pengajuan Sparepart', 'On Progress', 'Diproses'])) {
+                                    $statusBadge = 'warning text-dark';
+                                } elseif ($workStatus === 'Menunggu Konfirmasi') {
+                                    $statusBadge = 'info text-dark';
+                                } elseif (in_array($workStatus, ['Completed', 'Selesai', 'Selesai (DONE)'])) {
+                                    $statusBadge = 'success';
                                 }
                             @endphp
                             <span class="badge bg-{{ $statusBadge }}">
-                                {{ in_array($workStatus, ['On Check', 'Pengajuan Sparepart']) ? 'On Progress (' . $workStatus . ')' :$workStatus }}
+                                {{ in_array($workStatus, ['On Check', 'Pengajuan Sparepart']) ? 'On Progress (' . $workStatus . ')' : $workStatus }}
                             </span>
                         </td>
                         <td>
@@ -137,7 +156,7 @@
                                                             <textarea name="action_taken" class="form-control" rows="3" required placeholder="Jelaskan analisa / tindakan perbaikan yang dilakukan">{{ $ticket->action_taken }}</textarea>
                                                         </div>
 
-                                                        <!-- Input Tanggal Target Selesai (Diberi minimal hari ini) -->
+                                                        <!-- Input Tanggal Target Selesai -->
                                                         <div class="mb-3" id="target-wrapper-{{ $ticket->id }}">
                                                             <label class="form-label fw-bold text-dark">Tanggal Target Selesai <span class="text-danger">*</span></label>
                                                             <input 
@@ -228,6 +247,18 @@
                                         </div>
                                     </div>
                                 @endif
+
+                                {{-- Tombol Delete --}}
+                                @if(in_array(auth()->user()->role, ['ADMIN', 'IT']) || auth()->user()->hasRole('ADMIN'))
+                                    <form action="{{ route('tickets.destroy', $ticket->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus tiket #{{ $ticket->ticket_number }} ini?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-danger btn-sm mb-1">
+                                            <i class="bi bi-trash"></i> Delete
+                                        </button>
+                                    </form>
+                                @endif
+    
                             </div>
                         </td>
                     </tr>
@@ -259,7 +290,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (selectElement.value === 'Completed') {
             wrapper.style.display = 'none';
             input.removeAttribute('required');
-            input.value = ''; // Mengosongkan tanggal target
+            input.value = ''; 
         } else {
             wrapper.style.display = 'block';
             input.setAttribute('required', 'required');
@@ -267,10 +298,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     statusSelects.forEach(function (selectElement) {
-        // Run on initial load
         toggleTargetDate(selectElement);
-
-        // Run on select change
         selectElement.addEventListener('change', function () {
             toggleTargetDate(this);
         });

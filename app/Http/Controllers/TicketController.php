@@ -18,17 +18,14 @@ class TicketController extends Controller
     {
         $user = auth()->user();
         $selectedBranch = $request->input('branch');
+        $selectedStatus = $request->input('status');
 
-        // Query awal dengan Eager Loading
         $query = Ticket::with(['asset', 'user', 'bast'])->latest();
 
-        // 1. Filter Role OUTLET: Hanya melihat tiket buatan sendiri ATAU tiket dari cabang yang sama
         if ($user->role === 'OUTLET') {
             $userBranch = trim($user->branch_code ?? '');
-
             $query->where(function ($q) use ($user, $userBranch) {
                 $q->where('user_id', $user->id);
-
                 if (!empty($userBranch)) {
                     $q->orWhere(function ($sub) use ($userBranch) {
                         $sub->whereNotNull('branch_code')
@@ -37,14 +34,10 @@ class TicketController extends Controller
                     });
                 }
             });
-        } 
-        // 2. Filter Role IT / MAINTENANCE: Melihat tiket sesuai divisi penanggung jawab
-        elseif (in_array($user->role, ['IT', 'MAINTENANCE'])) {
+        } elseif (in_array($user->role, ['IT', 'MAINTENANCE'])) {
             $query->where('department', $user->role);
         }
-        // 3. Role ADMIN: Melihat seluruh data tiket tanpa filter role
 
-        // Filter Tambahan: Filter Branch dari Form / Dropdown jika dipilih
         if (!empty($selectedBranch)) {
             $query->where(function ($q) use ($selectedBranch) {
                 $q->where('branch_code', $selectedBranch)
@@ -56,9 +49,24 @@ class TicketController extends Controller
             });
         }
 
+        if (!empty($selectedStatus)) {
+            $query->where(function ($q) use ($selectedStatus) {
+                if ($selectedStatus === 'Menunggu Konfirmasi') {
+                    $q->where('status', 'Menunggu Konfirmasi');
+                } elseif ($selectedStatus === 'Completed') {
+                    $q->where(function ($sub) {
+                        $sub->whereIn('status', ['Selesai', 'Completed'])
+                            ->orWhere('work_status', 'Completed');
+                    })->where('status', '!=', 'Menunggu Konfirmasi');
+                } else {
+                    $q->where('status', $selectedStatus)
+                      ->orWhere('work_status', $selectedStatus);
+                }
+            });
+        }
+
         $tickets = $query->get();
 
-        // Ambil daftar Branch unik dari Users & Assets
         $branchCodes = User::whereNotNull('branch_code')->pluck('branch_code');
         $assetBranches = Asset::whereNotNull('branch_code')->pluck('branch_code');
 
@@ -74,10 +82,8 @@ class TicketController extends Controller
 
     public function create()
     {
-        // Tampilkan SELURUH aset terdaftar tanpa membatasi cabang pengguna
         $assets = Asset::orderBy('asset_name', 'asc')->get();
 
-        // Kumpulan Cabang Dinamis dari Tabel Assets
         $branches = Asset::whereNotNull('branch_code')
                          ->where('branch_code', '!=', '')
                          ->select('branch_code', 'branch_name')
@@ -85,7 +91,6 @@ class TicketController extends Controller
                          ->pluck('branch_name', 'branch_code')
                          ->toArray();
 
-        // Fallback default jika data cabang kosong
         if (empty($branches)) {
             $branches = [
                 'HOTNG' => 'HEAD OFFICE TANGERANG',
@@ -98,72 +103,74 @@ class TicketController extends Controller
     public function store(Request $request, TelegramService $telegram)
     {
         $request->validate([
-            'reporter_name' => 'required|string|max:255',
-            'asset_id'      => 'required|exists:assets,id',
-            'department'    => 'required|in:IT,MAINTENANCE',
-            'title'         => 'required|string|max:255',
-            'description'   => 'required|string',
-            'priority'      => 'required|in:Rendah,Sedang,Tinggi',
-            'branch_code'   => 'nullable|string',
-            'attachment'    => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120', // Max 5MB
+            'reporter_name'     => 'required|string|max:255',
+            'asset_id'          => 'nullable|exists:assets,id',
+            'custom_asset_name' => 'nullable|string|max:255',
+            'department'        => 'required|in:IT,MAINTENANCE',
+            'title'             => 'required|string|max:255',
+            'description'       => 'required|string',
+            'priority'          => 'required|in:Rendah,Sedang,Tinggi',
+            'branch_code'       => 'nullable|string',
+            'attachment'        => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
         ]);
 
-        $asset = Asset::find($request->asset_id);
+        if (empty($request->asset_id) && empty($request->custom_asset_name)) {
+            return back()->withErrors(['asset_id' => 'Pilih aset dari daftar atau ketik nama aset secara manual.'])->withInput();
+        }
+
+        $asset = $request->asset_id ? Asset::find($request->asset_id) : null;
         $user  = auth()->user();
 
-        // Handle Upload Lampiran Kerusakan Tiket
         $attachmentPath = null;
         if ($request->hasFile('attachment')) {
             $attachmentPath = $request->file('attachment')->store('tickets/attachments', 'public');
         }
 
-        // --- LOGIC BRANCH ---
         $branchCode = $request->filled('branch_code') 
             ? $request->branch_code 
-            : ($asset->branch_code ?? $user->branch_code ?? 'HOTNG');
+            : ($user->branch_code ?? ($asset->branch_code ?? 'HOTNG'));
 
-        $branchName = Asset::where('branch_code', $branchCode)->value('branch_name')
-            ?? User::where('branch_code', $branchCode)->value('branch_name')
-            ?? $asset->branch_name 
+        $branchName = User::where('branch_code', $branchCode)->value('branch_name')
+            ?? Asset::where('branch_code', $branchCode)->value('branch_name')
             ?? $user->branch_name 
-            ?? 'HEAD OFFICE TANGERANG';
+            ?? ($asset->branch_name ?? 'HEAD OFFICE TANGERANG');
 
         $ticketNumber = 'TKT-' . date('Ymd') . '-' . rand(1000, 9999);
 
         $ticket = Ticket::create([
-            'ticket_number' => $ticketNumber,
-            'user_id'       => $user->id,
-            'reporter_name' => $request->reporter_name,
-            'asset_id'      => $request->asset_id,
-            'department'    => $request->department,
-            'title'         => $request->title,
-            'description'   => $request->description,
-            'attachment'    => $attachmentPath,
-            'priority'      => $request->priority,
-            'branch_code'   => $branchCode,
-            'branch_name'   => $branchName,
-            'status'        => 'Terbuka',
+            'ticket_number'     => $ticketNumber,
+            'user_id'           => $user->id,
+            'reporter_name'     => $request->reporter_name,
+            'asset_id'          => $request->asset_id,
+            'custom_asset_name' => $request->custom_asset_name,
+            'department'        => $request->department,
+            'title'             => $request->title,
+            'description'       => $request->description,
+            'attachment'        => $attachmentPath,
+            'priority'          => $request->priority,
+            'branch_code'       => $branchCode,
+            'branch_name'       => $branchName,
+            'status'            => 'Terbuka',
         ]);
 
-        // --- KIRIM NOTIFIKASI TELEGRAM BERDASARKAN DIVISI ---
         try {
-            $cleanTitle    = htmlspecialchars($request->title, ENT_QUOTES, 'UTF-8');
-            $cleanDesc     = htmlspecialchars($request->description, ENT_QUOTES, 'UTF-8');
-            $cleanReporter = htmlspecialchars($request->reporter_name, ENT_QUOTES, 'UTF-8');
-            $division      = $request->department; // Mengambil divisi tujuan (IT / MAINTENANCE)
+            $assetDisplayName = $asset->asset_name ?? ($request->custom_asset_name . ' (Manual)');
+            $cleanTitle       = htmlspecialchars($request->title, ENT_QUOTES, 'UTF-8');
+            $cleanDesc        = htmlspecialchars($request->description, ENT_QUOTES, 'UTF-8');
+            $cleanReporter    = htmlspecialchars($request->reporter_name, ENT_QUOTES, 'UTF-8');
+            $division         = $request->department;
 
             $message  = "🚨 <b>TIKET PERBAIKAN BARU</b>\n\n";
             $message .= "<b>No. Tiket:</b> #" . $ticketNumber . "\n";
             $message .= "<b>Cabang:</b> " . $branchName . "\n";
             $message .= "<b>Pelapor:</b> " . $cleanReporter . "\n";
             $message .= "<b>Divisi Tujuan:</b> " . $division . "\n";
-            $message .= "<b>Aset:</b> " . ($asset->asset_name ?? '-') . "\n";
+            $message .= "<b>Aset:</b> " . $assetDisplayName . "\n";
             $message .= "<b>Prioritas:</b> " . $request->priority . "\n";
             $message .= "<b>Judul:</b> " . $cleanTitle . "\n";
             $message .= "<b>Kendala:</b> " . $cleanDesc . "\n\n";
             $message .= "<i>Silakan login ke portal untuk memproses tiket ini.</i>";
 
-            // Kirim dengan menyertakan parameter divisi agar masuk ke bot & channel yang sesuai
             if ($attachmentPath && in_array(pathinfo($attachmentPath, PATHINFO_EXTENSION), ['jpg', 'jpeg', 'png'])) {
                 $fullPhotoPath = storage_path('app/public/' . $attachmentPath);
                 if (file_exists($fullPhotoPath)) {
@@ -187,9 +194,33 @@ class TicketController extends Controller
         return view('tickets.show', compact('ticket'));
     }
 
-    /**
-     * Memperbarui informasi Pengerjaan (WORK) oleh Teknisi/Admin
-     */
+    public function destroy($id)
+    {
+        $user = auth()->user();
+
+        if (!in_array($user->role, ['ADMIN', 'IT']) && !$user->hasRole('ADMIN')) {
+            return redirect()->back()->with('error', 'Anda tidak memiliki hak akses untuk menghapus tiket ini.');
+        }
+
+        $ticket = Ticket::with(['bast', 'asset'])->findOrFail($id);
+
+        if ($ticket->attachment && Storage::disk('public')->exists($ticket->attachment)) {
+            Storage::disk('public')->delete($ticket->attachment);
+        }
+
+        if ($ticket->bast && $ticket->bast->attachment && Storage::disk('public')->exists($ticket->bast->attachment)) {
+            Storage::disk('public')->delete($ticket->bast->attachment);
+        }
+
+        if ($ticket->bast) {
+            $ticket->bast->delete();
+        }
+
+        $ticket->delete();
+
+        return redirect()->route('tickets.index')->with('success', 'Tiket perbaikan berhasil dihapus.');
+    }
+
     public function updateWork(Request $request, $id)
     {
         $request->validate([
@@ -200,7 +231,6 @@ class TicketController extends Controller
         ]);
 
         $ticket = Ticket::findOrFail($id);
-
         $newMainStatus = ($request->work_status === 'Completed') ? $ticket->status : 'Diproses';
 
         $ticket->update([
@@ -230,7 +260,7 @@ class TicketController extends Controller
         $request->validate([
             'action_taken'   => 'required|string',
             'parts_replaced' => 'nullable|string',
-            'attachment'     => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120', // Max 5MB
+            'attachment'     => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
         ]);
 
         $ticket = Ticket::findOrFail($id);
@@ -256,12 +286,11 @@ class TicketController extends Controller
 
         $ticket->update(['status' => 'Menunggu Konfirmasi']);
 
-        // --- KIRIM NOTIFIKASI BAST / SELESAI PENGERJAAN KE TELEGRAM ---
         try {
             $techName    = $request->technician_name ?? auth()->user()->name;
             $cleanAction = htmlspecialchars($request->action_taken, ENT_QUOTES, 'UTF-8');
             $cleanParts  = htmlspecialchars($request->parts_replaced ?? '-', ENT_QUOTES, 'UTF-8');
-            $division    = $ticket->department; // Mengambil divisi tiket terkait
+            $division    = $ticket->department;
 
             $message  = "🛠️ <b>BERITA ACARA SERAH TERIMA (BAST) DIBUAT</b>\n\n";
             $message .= "<b>No. Tiket:</b> #" . $ticket->ticket_number . "\n";
@@ -290,9 +319,6 @@ class TicketController extends Controller
         return redirect()->route('tickets.show', $ticket->id)->with('success', 'Form BAST berhasil dibuat. Menunggu konfirmasi DONE dari user.');
     }
 
-    /**
-     * Konfirmasi Tiket Selesai (DONE) oleh User Pembuat Tiket / Admin
-     */
     public function markAsDone(Request $request, $id, TelegramService $telegram)
     {
         $ticket = Ticket::findOrFail($id);
@@ -324,9 +350,8 @@ class TicketController extends Controller
             ]);
         }
 
-        // --- KIRIM NOTIFIKASI TIKET SELESAI KE TELEGRAM ---
         try {
-            $division = $ticket->department; // Mengambil divisi tiket terkait
+            $division = $ticket->department;
 
             $message  = "✅ <b>TIKET PERBAIKAN SELESAI (DONE)</b>\n\n";
             $message .= "<b>No. Tiket:</b> #" . $ticket->ticket_number . "\n";
@@ -342,5 +367,59 @@ class TicketController extends Controller
         }
 
         return redirect()->back()->with('success', 'Tiket berhasil dikonfirmasi Selesai (DONE) pada tanggal ' . $completedAt->format('d/m/Y H:i') . '.');
+    }
+
+    /**
+     * Menampilkan Dashboard SLA & Ticket Trend dengan Data Riil Database
+     */
+    public function slaDashboard()
+    {
+        // 1. Hitung Total Tiket Berdasarkan Divisi IT & MAINTENANCE
+        $itCount = Ticket::where('department', 'IT')->count();
+        $maintenanceCount = Ticket::where('department', 'MAINTENANCE')->count();
+        $totalTickets = $itCount + $maintenanceCount;
+
+        // 2. Hitung Berdasarkan Prioritas untuk Divisi IT
+        $itPriorities = [
+            'Rendah' => Ticket::where('department', 'IT')->where('priority', 'Rendah')->count(),
+            'Sedang' => Ticket::where('department', 'IT')->where('priority', 'Sedang')->count(),
+            'Tinggi' => Ticket::where('department', 'IT')->where('priority', 'Tinggi')->count(),
+        ];
+
+        // 3. Hitung Berdasarkan Prioritas untuk Divisi Maintenance
+        $maintPriorities = [
+            'Rendah' => Ticket::where('department', 'MAINTENANCE')->where('priority', 'Rendah')->count(),
+            'Sedang' => Ticket::where('department', 'MAINTENANCE')->where('priority', 'Sedang')->count(),
+            'Tinggi' => Ticket::where('department', 'MAINTENANCE')->where('priority', 'Tinggi')->count(),
+        ];
+
+        // 4. Hitung Persentase Closure / SLA Rate IT & Maintenance
+        $itCompleted = Ticket::where('department', 'IT')->where(function($q) {
+            $q->whereIn('status', ['Selesai', 'Completed'])->orWhere('work_status', 'Completed');
+        })->count();
+        $itClosureRate = $itCount > 0 ? round(($itCompleted / $itCount) * 100) : 0;
+
+        $maintCompleted = Ticket::where('department', 'MAINTENANCE')->where(function($q) {
+            $q->whereIn('status', ['Selesai', 'Completed'])->orWhere('work_status', 'Completed');
+        })->count();
+        $maintClosureRate = $maintenanceCount > 0 ? round(($maintCompleted / $maintenanceCount) * 100) : 0;
+
+        // 5. Data Tren Harian Berdasarkan Divisi (10 Hari Terakhir)
+        $dailyTrends = Ticket::selectRaw('DATE(created_at) as date, department, count(*) as count')
+            ->groupBy('date', 'department')
+            ->orderBy('date', 'ASC')
+            ->limit(20)
+            ->get();
+
+        return view('tickets.sla_dashboard', compact(
+            'totalTickets', 
+            'itCount', 
+            'maintenanceCount', 
+            'itPriorities', 
+            'maintPriorities', 
+            'itClosureRate', 
+            'maintClosureRate', 
+            'dailyTrends'
+        ));
     }
 }

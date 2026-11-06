@@ -54,7 +54,8 @@
     $isIT          = $hasRole('IT');
     $isMaintenance = $hasRole('MAINTENANCE');
     $isHC          = $hasRole('HC');
-    $isOutlet       = $hasRole('OUTLET');
+    $isOutlet      = $hasRole('OUTLET');
+    $isManagement  = $hasRole('MANAGEMENT');
 
     $branchInfo = $user?->branch_name 
         ?? $user?->outlet_name 
@@ -121,7 +122,7 @@
 
             @if($isIT || $isHC || $isOutlet)
                 <li class="nav-item mt-2">
-                    <small class="text-secondary fw-bold text-uppercase px-2 fs-8">HC LEARNING</small>
+                    <small class="text-secondary fw-bold text-uppercase px-2 fs-8" style="letter-spacing: 0.5px;">HC LEARNING</small>
                 </li>
                 <li>
                     <a href="{{ route('hc.elearning.index') }}" class="nav-link text-white {{ request()->routeIs('hc.elearning*') ? 'active bg-primary' : '' }}">
@@ -136,6 +137,33 @@
                 <li>
                     <a href="{{ route('hc.posttest.index') }}" class="nav-link text-white {{ request()->routeIs('hc.posttest*') ? 'active bg-primary' : '' }}">
                         <i class="bi bi-file-earmark-check me-2"></i> Post-Test
+                    </a>
+                </li>
+                <hr class="my-2 border-secondary">
+            @endif
+
+            @if($isIT || $isHC || $isOutlet || $isManagement)
+                <li class="nav-item mt-2">
+                    <small class="text-secondary fw-bold text-uppercase px-2 fs-8" style="letter-spacing: 0.5px;">HC RECRUITMENT</small>
+                </li>
+                <li>
+                    <a href="{{ route('hc.dashboard') }}" class="nav-link text-white {{ request()->routeIs('hc.dashboard*') ? 'active bg-primary' : '' }}">
+                        <i class="bi bi-speedometer2 me-2"></i> Dashboard SLA
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ route('hc.manpower.index') }}" class="nav-link text-white {{ request()->routeIs('hc.manpower*') ? 'active bg-primary' : '' }}">
+                        <i class="bi bi-file-earmark-person me-2"></i> Manpower Request
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ route('hc.vacancies.index') }}" class="nav-link text-white {{ request()->routeIs('hc.vacancies*') ? 'active bg-primary' : '' }}">
+                        <i class="bi bi-briefcase me-2"></i> Vacancy & Pipeline
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ route('hc.candidates.index') }}" class="nav-link text-white {{ request()->routeIs('hc.candidates*') ? 'active bg-primary' : '' }}">
+                        <i class="bi bi-people me-2"></i> Candidate Database
                     </a>
                 </li>
                 <hr class="my-2 border-secondary">
@@ -163,14 +191,26 @@
                         <i class="bi bi-box-seam me-2"></i> Inventori
                     </a>
                 </li>
+                <li>
+                    <a href="{{ route('asset-management.index') }}" class="nav-link text-white {{ request()->routeIs('asset-management*') ? 'active bg-primary' : '' }}">
+                        <i class="bi bi-laptop me-2"></i> Asset Management
+                    </a>
+                </li>
                 @endif
                 <li>
-                    <a href="{{ route('tickets.index') }}" class="nav-link text-white {{ request()->routeIs('tickets*') ? 'active bg-primary' : '' }}">
+                    <a href="{{ route('tickets.index') }}" class="nav-link text-white {{ request()->routeIs('tickets.index*') || request()->routeIs('tickets.show*') || request()->routeIs('tickets.create*') ? 'active bg-primary' : '' }}">
                         <i class="bi bi-wrench me-2"></i> Corrective/Tiket
+                    </a>
+                </li>
+                {{-- Menu Dashboard SLA & Trend Tiket --}}
+                <li>
+                    <a href="{{ route('tickets.sla-dashboard') }}" class="nav-link text-white {{ request()->routeIs('tickets.sla-dashboard*') ? 'active bg-primary' : '' }}">
+                        <i class="bi bi-bar-chart-line me-2"></i> Dashboard SLA & Trend
                     </a>
                 </li>
                 <hr class="my-2 border-secondary">
             @endif
+
 
             <li class="nav-item mt-2">
                 <small class="text-secondary fw-bold text-uppercase px-2 fs-8">PANDUAN</small>
@@ -183,8 +223,7 @@
             <hr class="my-2 border-secondary">
         </ul>
         
-        <hr class="my-3 border-secondary">
-        <div class="mt-auto">
+        <div class="mt-auto pt-3 border-top border-secondary">
             @auth
             <div class="d-flex align-items-center mb-3 text-white px-1">
                 <i class="bi bi-person-circle fs-2 me-2 text-light flex-shrink-0"></i>
@@ -228,31 +267,37 @@
                     <li><a href="{{ route('report.it') }}" class="nav-link text-white {{ request()->routeIs('report.it*') ? 'active bg-primary' : '' }}"><i class="bi bi-file-earmark-text me-2"></i> Report Corrective</a></li>
                     <hr class="my-2 border-secondary">
                 @endif
-                <!-- SECTION: HC LEARNING -->
-                @if($isIT || $isHC || $isOutlet)
-                    <li class="nav-item mt-2">
-                        <small class="text-secondary fw-bold text-uppercase px-2 fs-8" style="letter-spacing: 0.5px;">HC LEARNING</small>
-                    </li>
-                    <li>
-                        <a href="{{ route('hc.elearning.index') }}" class="nav-link text-white {{ request()->routeIs('hc.elearning*') ? 'active bg-primary' : '' }}">
-                            <i class="bi bi-mortarboard me-2"></i> e-Learning
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('hc.pretest.index') }}" class="nav-link text-white {{ request()->routeIs('hc.pretest*') ? 'active bg-primary' : '' }}">
-                            <i class="bi bi-file-earmark-text me-2"></i> Pre-Test
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('hc.posttest.index') }}" class="nav-link text-white {{ request()->routeIs('hc.posttest*') ? 'active bg-primary' : '' }}">
-                            <i class="bi bi-file-earmark-check me-2"></i> Post-Test
-                        </a>
-                    </li>
-                    <hr class="my-2 border-secondary">
+
+                {{-- HC LEARNING CATEGORY --}}
+                @if(auth()->user()->hasPermission('e-learning') || auth()->user()->hasPermission('pre-test') || auth()->user()->hasPermission('post-test'))
+                    <div class="sidebar-heading">HC LEARNING</div>
+
+                    @if(auth()->user()->hasPermission('e-learning'))
+                        <li class="nav-item">
+                            <a href="{{ route('elearning.index') }}" class="nav-link">
+                                <span>e-Learning</span>
+                            </a>
+                        </li>
+                    @endif
+
+                    @if(auth()->user()->hasPermission('pre-test'))
+                        <li class="nav-item">
+                            <a href="{{ route('pretest.index') }}" class="nav-link">
+                                <span>Pre-Test</span>
+                            </a>
+                        </li>
+                    @endif
+
+                    @if(auth()->user()->hasPermission('post-test'))
+                        <li class="nav-item">
+                            <a href="{{ route('posttest.index') }}" class="nav-link">
+                                <span>Post-Test</span>
+                            </a>
+                        </li>
+                    @endif
                 @endif
 
-                <!-- SECTION: HC RECRUITMENT (Gunakan Auth Check Langsung agar Tidak Luput) -->
-                @if(auth()->check() && in_array(auth()->user()->role, ['ADMIN', 'IT', 'HC', 'MANAGEMENT', 'OUTLET']))
+                @if($isIT || $isHC || $isOutlet || $isManagement)
                     <li class="nav-item mt-2">
                         <small class="text-secondary fw-bold text-uppercase px-2 fs-8" style="letter-spacing: 0.5px;">HC RECRUITMENT</small>
                     </li>
@@ -278,22 +323,33 @@
                     </li>
                     <hr class="my-2 border-secondary">
                 @endif
+
                 @if($isMaintenance)
                     <li class="nav-item mt-2"><small class="text-secondary fw-bold text-uppercase px-2 fs-8">MAINTENANCE</small></li>
                     <li><a href="{{ route('report.maintenance') }}" class="nav-link text-white {{ request()->routeIs('report.maintenance*') ? 'active bg-primary' : '' }}"><i class="bi bi-file-earmark-text me-2"></i> Report Corrective</a></li>
                     <hr class="my-2 border-secondary">
                 @endif
+
                 @if($isIT || $isMaintenance || $isOutlet)
                     <li class="nav-item mt-2"><small class="text-secondary fw-bold text-uppercase px-2 fs-8">ASSET & SUPPORT</small></li>
                     @if($isIT || $isMaintenance)
                     <li><a href="{{ route('assets.index') }}" class="nav-link text-white {{ request()->routeIs('assets*') ? 'active bg-primary' : '' }}"><i class="bi bi-box-seam me-2"></i> Inventori</a></li>
+                    <li><a href="{{ route('asset-management.index') }}" class="nav-link text-white {{ request()->routeIs('asset-management*') ? 'active bg-primary' : '' }}"><i class="bi bi-laptop me-2"></i> Asset Management</a></li>
                     @endif
-                    <li><a href="{{ route('tickets.index') }}" class="nav-link text-white {{ request()->routeIs('tickets*') ? 'active bg-primary' : '' }}"><i class="bi bi-wrench me-2"></i> Corrective/Tiket</a></li>
+                    <li><a href="{{ route('tickets.index') }}" class="nav-link text-white {{ request()->routeIs('tickets.index*') || request()->routeIs('tickets.show*') || request()->routeIs('tickets.create*') ? 'active bg-primary' : '' }}"><i class="bi bi-wrench me-2"></i> Corrective/Tiket</a></li>
+                    <li><a href="{{ route('tickets.sla-dashboard') }}" class="nav-link text-white {{ request()->routeIs('tickets.sla-dashboard*') ? 'active bg-primary' : '' }}"><i class="bi bi-bar-chart-line me-2"></i> Dashboard SLA & Trend</a></li>
                     <hr class="my-2 border-secondary">
                 @endif
-                <li class="nav-item mt-2"><small class="text-secondary fw-bold text-uppercase px-2 fs-8">PANDUAN</small></li>
-                <li><a href="{{ route('panduan.index') }}" class="nav-link text-white {{ request()->routeIs('panduan*') ? 'active bg-primary' : '' }}"><i class="bi bi-book me-2"></i> Panduan Penggunaan</a></li>
-                <hr class="my-2 border-secondary">
+
+                {{-- PANDUAN --}}
+                @if(auth()->user()->hasPermission('panduan-penggunaan'))
+                    <li class="nav-item">
+                        <a href="{{ route('panduan.index') }}" class="nav-link">
+                            <i class="fas fa-book"></i>
+                            <span>Panduan Penggunaan</span>
+                        </a>
+                    </li>
+                @endif
             </ul>
             
             <div class="mt-4 pt-3 border-top border-secondary">
@@ -339,7 +395,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-@extends('layouts.footer')
 
+@include('layouts.footer')
+</body>
 </html>

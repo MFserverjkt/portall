@@ -23,7 +23,7 @@
                     <p class="mb-2"><strong>Pelapor:</strong> {{ $ticket->reporter_name ?? $ticket->user->name ?? '-' }} <span class="badge bg-secondary text-uppercase ms-1">{{ $ticket->user->role ?? 'USER' }}</span></p>
                     <p class="mb-0">
                         <strong>Aset Terkait:</strong> 
-                        {{ $ticket->asset->asset_name ?? '-' }} 
+                        {{ $ticket->asset->asset_name ?? $ticket->custom_asset_name ?? '-' }} 
                         @if(isset($ticket->asset->asset_code))
                             ({{ $ticket->asset->asset_code }})
                         @endif
