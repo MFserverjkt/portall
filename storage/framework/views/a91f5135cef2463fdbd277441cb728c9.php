@@ -169,7 +169,13 @@
                 <hr class="my-2 border-secondary">
             <?php endif; ?>
 
-            <?php if($isMaintenance): ?>
+            <?php
+                $userRole = auth()->user()->role ?? '';
+                // Mengizinkan ADMIN, IT, dan MAINTENANCE untuk melihat menu ini
+                $canSeeMaintenance = ($isMaintenance ?? false) || in_array($userRole, ['ADMIN', 'IT', 'MAINTENANCE']);
+            ?>
+
+            <?php if($canSeeMaintenance): ?>
                 <li class="nav-item mt-2">
                     <small class="text-secondary fw-bold text-uppercase px-2 fs-8">MAINTENANCE</small>
                 </li>
