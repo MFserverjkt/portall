@@ -93,7 +93,14 @@
                         </td>
 
                         <td>
-                            <span class="badge bg-warning text-dark text-uppercase">
+                            @php
+                                $dept = strtoupper($ticket->department ?? '');
+                                $badgeClass = 'bg-warning text-dark';
+                                if ($dept === 'MAINTENANCE') {
+                                    $badgeClass = 'bg-info text-dark';
+                                }
+                            @endphp
+                            <span class="badge {{ $badgeClass }} text-uppercase">
                                 {{ $ticket->department }}
                             </span>
                         </td>
@@ -124,7 +131,7 @@
                                     <i class="bi bi-eye"></i> View
                                 </a>
 
-                                <!-- Tombol WORK (Untuk teknisi IT / Maintenance / Admin) -->
+                                <!-- Tombol WORK (Ditampilkan untuk role ADMIN, IT, dan MAINTENANCE) -->
                                 @if(in_array(auth()->user()->role, ['ADMIN', 'IT', 'MAINTENANCE']) && !in_array($ticket->status, ['Selesai', 'Selesai (DONE)']))
                                     <button type="button" class="btn btn-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalWork{{ $ticket->id }}" title="Update Pengerjaan Tiket">
                                         <i class="bi bi-tools"></i> WORK
@@ -248,7 +255,7 @@
                                     </div>
                                 @endif
 
-                                {{-- Tombol Delete --}}
+                                {{-- Tombol Delete (Hanya untuk ADMIN & IT, role MAINTENANCE tidak diizinkan menghapus) --}}
                                 @if(in_array(auth()->user()->role, ['ADMIN', 'IT']) || auth()->user()->hasRole('ADMIN'))
                                     <form action="{{ route('tickets.destroy', $ticket->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus tiket #{{ $ticket->ticket_number }} ini?');">
                                         @csrf

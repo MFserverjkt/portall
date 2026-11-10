@@ -15,70 +15,75 @@ use Carbon\Carbon;
 class TicketController extends Controller
 {
     public function index(Request $request)
-    {
-        $user = auth()->user();
-        $selectedBranch = $request->input('branch');
-        $selectedStatus = $request->input('status');
+{
+    $user = auth()->user();
+    $selectedBranch = $request->input('branch');
+    $selectedStatus = $request->input('status');
 
-        $query = Ticket::with(['asset', 'user', 'bast'])->latest();
+    $query = Ticket::with(['asset', 'user', 'bast'])->latest();
 
-        if ($user->role === 'OUTLET') {
-            $userBranch = trim($user->branch_code ?? '');
-            $query->where(function ($q) use ($user, $userBranch) {
-                $q->where('user_id', $user->id);
-                if (!empty($userBranch)) {
-                    $q->orWhere(function ($sub) use ($userBranch) {
-                        $sub->whereNotNull('branch_code')
-                            ->where('branch_code', '!=', '')
-                            ->where('branch_code', $userBranch);
-                    });
-                }
-            });
-        } elseif (in_array($user->role, ['IT', 'MAINTENANCE'])) {
-            $query->where('department', $user->role);
-        }
-
-        if (!empty($selectedBranch)) {
-            $query->where(function ($q) use ($selectedBranch) {
-                $q->where('branch_code', $selectedBranch)
-                  ->orWhere('branch_name', $selectedBranch)
-                  ->orWhereHas('user', function ($subQuery) use ($selectedBranch) {
-                      $subQuery->where('branch_code', $selectedBranch)
-                               ->orWhere('branch_name', $selectedBranch);
-                  });
-            });
-        }
-
-        if (!empty($selectedStatus)) {
-            $query->where(function ($q) use ($selectedStatus) {
-                if ($selectedStatus === 'Menunggu Konfirmasi') {
-                    $q->where('status', 'Menunggu Konfirmasi');
-                } elseif ($selectedStatus === 'Completed') {
-                    $q->where(function ($sub) {
-                        $sub->whereIn('status', ['Selesai', 'Completed'])
-                            ->orWhere('work_status', 'Completed');
-                    })->where('status', '!=', 'Menunggu Konfirmasi');
-                } else {
-                    $q->where('status', $selectedStatus)
-                      ->orWhere('work_status', $selectedStatus);
-                }
-            });
-        }
-
-        $tickets = $query->get();
-
-        $branchCodes = User::whereNotNull('branch_code')->pluck('branch_code');
-        $assetBranches = Asset::whereNotNull('branch_code')->pluck('branch_code');
-
-        $branches = $branchCodes
-            ->merge($assetBranches)
-            ->filter()
-            ->unique()
-            ->sort()
-            ->values();
-
-        return view('tickets.index', compact('tickets', 'branches'));
+    if ($user->role === 'OUTLET') {
+        $userBranch = trim($user->branch_code ?? '');
+        $query->where(function ($q) use ($user, $userBranch) {
+            $q->where('user_id', $user->id);
+            if (!empty($userBranch)) {
+                $q->orWhere(function ($sub) use ($userBranch) {
+                    $sub->whereNotNull('branch_code')
+                        ->where('branch_code', '!=', '')
+                        ->where('branch_code', $userBranch);
+                });
+            }
+        });
+    } elseif ($user->role === 'IT') {
+        // Role IT dapat melihat tiket departemen IT DAN MAINTENANCE
+        $query->whereIn('department', ['IT', 'MAINTENANCE']);
+    } elseif ($user->role === 'MAINTENANCE') {
+        // Role MAINTENANCE hanya dapat melihat tiket departemen MAINTENANCE saja
+        $query->where('department', 'MAINTENANCE');
     }
+    // Jika ADMIN, tidak perlu pembatasan departemen (bisa melihat semua)
+
+    if (!empty($selectedBranch)) {
+        $query->where(function ($q) use ($selectedBranch) {
+            $q->where('branch_code', $selectedBranch)
+              ->orWhere('branch_name', $selectedBranch)
+              ->orWhereHas('user', function ($subQuery) use ($selectedBranch) {
+                  $subQuery->where('branch_code', $selectedBranch)
+                           ->orWhere('branch_name', $selectedBranch);
+              });
+        });
+    }
+
+    if (!empty($selectedStatus)) {
+        $query->where(function ($q) use ($selectedStatus) {
+            if ($selectedStatus === 'Menunggu Konfirmasi') {
+                $q->where('status', 'Menunggu Konfirmasi');
+            } elseif ($selectedStatus === 'Completed') {
+                $q->where(function ($sub) {
+                    $sub->whereIn('status', ['Selesai', 'Completed'])
+                        ->orWhere('work_status', 'Completed');
+                })->where('status', '!=', 'Menunggu Konfirmasi');
+            } else {
+                $q->where('status', $selectedStatus)
+                  ->orWhere('work_status', $selectedStatus);
+            }
+        });
+    }
+
+    $tickets = $query->get();
+
+    $branchCodes = User::whereNotNull('branch_code')->pluck('branch_code');
+    $assetBranches = Asset::whereNotNull('branch_code')->pluck('branch_code');
+
+    $branches = $branchCodes
+        ->merge($assetBranches)
+        ->filter()
+        ->unique()
+        ->sort()
+        ->values();
+
+    return view('tickets.index', compact('tickets', 'branches'));
+}
 
     public function create()
     {
