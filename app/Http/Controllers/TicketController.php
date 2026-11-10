@@ -123,6 +123,7 @@ class TicketController extends Controller
 
         $attachmentPath = null;
         if ($request->hasFile('attachment')) {
+            // Memastikan file tersimpan secara eksplisit ke disk public di dalam folder tickets/attachments
             $attachmentPath = $request->file('attachment')->store('tickets/attachments', 'public');
         }
 
@@ -265,12 +266,13 @@ class TicketController extends Controller
 
         $ticket = Ticket::findOrFail($id);
 
-        $attachmentPath = $ticket->bast->attachment ?? null;
+        $attachmentPath = optional($ticket->bast)->attachment ?? null;
         if ($request->hasFile('attachment')) {
             if ($attachmentPath && Storage::disk('public')->exists($attachmentPath)) {
                 Storage::disk('public')->delete($attachmentPath);
             }
-            $attachmentPath = $request->file('attachment')->store('basts/attachments', 'public');
+            // Menyimpan file BAST secara eksplisit ke dalam folder basts
+            $attachmentPath = $request->file('attachment')->store('basts', 'public');
         }
 
         $ticket->bast()->updateOrCreate(
@@ -280,7 +282,7 @@ class TicketController extends Controller
                 'technician_name' => $request->technician_name ?? auth()->user()->name,
                 'action_taken'    => $request->action_taken,
                 'parts_replaced'  => $request->parts_replaced,
-                'attachment'      => $attachmentPath ?? $ticket->bast->attachment ?? null,
+                'attachment'      => $attachmentPath ?? optional($ticket->bast)->attachment ?? null,
             ]
         );
 
@@ -374,26 +376,22 @@ class TicketController extends Controller
      */
     public function slaDashboard()
     {
-        // 1. Hitung Total Tiket Berdasarkan Divisi IT & MAINTENANCE
         $itCount = Ticket::where('department', 'IT')->count();
         $maintenanceCount = Ticket::where('department', 'MAINTENANCE')->count();
         $totalTickets = $itCount + $maintenanceCount;
 
-        // 2. Hitung Berdasarkan Prioritas untuk Divisi IT
         $itPriorities = [
             'Rendah' => Ticket::where('department', 'IT')->where('priority', 'Rendah')->count(),
             'Sedang' => Ticket::where('department', 'IT')->where('priority', 'Sedang')->count(),
             'Tinggi' => Ticket::where('department', 'IT')->where('priority', 'Tinggi')->count(),
         ];
 
-        // 3. Hitung Berdasarkan Prioritas untuk Divisi Maintenance
         $maintPriorities = [
             'Rendah' => Ticket::where('department', 'MAINTENANCE')->where('priority', 'Rendah')->count(),
             'Sedang' => Ticket::where('department', 'MAINTENANCE')->where('priority', 'Sedang')->count(),
             'Tinggi' => Ticket::where('department', 'MAINTENANCE')->where('priority', 'Tinggi')->count(),
         ];
 
-        // 4. Hitung Persentase Closure / SLA Rate IT & Maintenance
         $itCompleted = Ticket::where('department', 'IT')->where(function($q) {
             $q->whereIn('status', ['Selesai', 'Completed'])->orWhere('work_status', 'Completed');
         })->count();
@@ -404,7 +402,6 @@ class TicketController extends Controller
         })->count();
         $maintClosureRate = $maintenanceCount > 0 ? round(($maintCompleted / $maintenanceCount) * 100) : 0;
 
-        // 5. Data Tren Harian Berdasarkan Divisi (10 Hari Terakhir)
         $dailyTrends = Ticket::selectRaw('DATE(created_at) as date, department, count(*) as count')
             ->groupBy('date', 'department')
             ->orderBy('date', 'ASC')

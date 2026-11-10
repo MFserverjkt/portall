@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Management Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { min-height: 100vh; background-color: #f8f9fa; }
+        .nav-link { border-radius: 0.375rem; transition: background-color 0.2s; }
+        .nav-link:hover { background-color: rgba(255, 255, 255, 0.1); }
+        .fs-7 { font-size: 0.85rem !important; }
+        .fs-8 { font-size: 0.75rem !important; }
+
+        @media (min-width: 768px) {
+            #sidebarDesktop { width: 260px; min-height: 100vh; }
+        }
+    </style>
+</head>
+<body>
+<?php
+    $user = auth()->user();
+
+    $userName = $user?->name ?? $user?->username ?? 'User';
+
+    $detectedRole = 'GUEST';
+    if ($user) {
+        if (method_exists($user, 'getRoleNames') && $user->getRoleNames()->count() > 0) {
+            $detectedRole = $user->getRoleNames()->first();
+        } else {
+            $detectedRole = $user->role ?? 'GUEST';
+        }
+    }
+    $userRole = strtoupper(trim($detectedRole));
+
+    $hasRole = function(...$roles) use ($user, $userRole) {
+        if (!$user) return false;
+
+        if (in_array($userRole, ['ADMIN', 'ADMINISTRATOR'])) {
+            return true;
+        }
+
+        if (method_exists($user, 'hasAnyRole')) {
+            if ($user->hasAnyRole($roles) || $user->hasAnyRole(array_map('strtolower', $roles))) {
+                return true;
+            }
+        }
+
+        $upperRoles = array_map('strtoupper', $roles);
+        return in_array($userRole, $upperRoles);
+    };
+
+    $isIT          = $hasRole('IT');
+    $isMaintenance = $hasRole('MAINTENANCE');
+    $isHC          = $hasRole('HC');
+    $isOutlet      = $hasRole('OUTLET');
+    $isManagement  = $hasRole('MANAGEMENT');
+
+    $branchInfo = $user?->branch_name 
+        ?? $user?->outlet_name 
+        ?? $user?->branch_code 
+        ?? $user?->outlet_code 
+        ?? null;
+
+    $roleBadgeClass = match($userRole) {
+        'ADMIN', 'ADMINISTRATOR' => 'bg-danger text-white',
+        'IT'                    => 'bg-primary text-white',
+        'MAINTENANCE'           => 'bg-warning text-dark',
+        'OUTLET'                => 'bg-info text-white',
+        'HC'                    => 'bg-success text-white',
+        default                 => 'bg-secondary text-white'
+    };
+?>
+
+<!-- NAVBAR MOBILE (< 768px) -->
+<nav class="navbar navbar-dark bg-dark d-md-none sticky-top shadow-sm px-3">
+    <div class="container-fluid p-0">
+        <button class="navbar-toggler border-0 p-1" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarMobile" aria-controls="sidebarMobile">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <span class="navbar-brand fw-bold text-primary mb-0 fs-6">PORTAL APP</span>
+        <div class="d-flex align-items-center">
+            <span class="badge <?php echo e($roleBadgeClass); ?> fs-8">(<?php echo e($userRole); ?>)</span>
+        </div>
+    </div>
+</nav>
+
+<div class="d-flex">
+    <!-- SIDEBAR DESKTOP (≥ 768px) -->
+    <div class="bg-dark text-white p-3 d-none d-md-flex flex-column flex-shrink-0" id="sidebarDesktop">
+        <h4 class="text-center my-3 fw-bold text-primary">PORTAL APP</h4>
+        <hr class="border-secondary">
+        
+        <ul class="nav nav-pills flex-column mb-auto">
+            <?php if($isIT): ?>
+                <li class="nav-item mt-2">
+                    <small class="text-secondary fw-bold text-uppercase px-2 fs-8">IT</small>
+                </li>
+                <li>
+                    <a href="<?php echo e(route('users.index')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('users.index*') ? 'active bg-primary' : ''); ?>">
+                        <i class="bi bi-people me-2"></i> User Management
+                    </a>
+                </li>
+                <li>
+                    <a href="<?php echo e(route('users.roles')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('users.roles*') ? 'active bg-primary' : ''); ?>">
+                        <i class="bi bi-shield-lock me-2"></i> User Role
+                    </a>
+                </li>
+                <li>
+                    <a href="<?php echo e(route('it.checklist.create')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('it.checklist*') ? 'active bg-primary' : ''); ?>">
+                        <i class="bi bi-check2-square me-2"></i> Checklist Outlet
+                    </a>
+                </li>
+                <li>
+                    <a href="<?php echo e(route('report.it')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('report.it*') ? 'active bg-primary' : ''); ?>">
+                        <i class="bi bi-file-earmark-text me-2"></i> Report Corrective
+                    </a>
+                </li>
+                <hr class="my-2 border-secondary">
+            <?php endif; ?>
+
+            <?php if($isIT || $isHC || $isOutlet): ?>
+                <li class="nav-item mt-2">
+                    <small class="text-secondary fw-bold text-uppercase px-2 fs-8" style="letter-spacing: 0.5px;">HC LEARNING</small>
+                </li>
+                <li>
+                    <a href="<?php echo e(route('hc.elearning.index')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('hc.elearning*') ? 'active bg-primary' : ''); ?>">
+                        <i class="bi bi-mortarboard me-2"></i> e-Learning
+                    </a>
+                </li>
+                <li>
+                    <a href="<?php echo e(route('hc.pretest.index')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('hc.pretest*') ? 'active bg-primary' : ''); ?>">
+                        <i class="bi bi-file-earmark-text me-2"></i> Pre-Test
+                    </a>
+                </li>
+                <li>
+                    <a href="<?php echo e(route('hc.posttest.index')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('hc.posttest*') ? 'active bg-primary' : ''); ?>">
+                        <i class="bi bi-file-earmark-check me-2"></i> Post-Test
+                    </a>
+                </li>
+                <hr class="my-2 border-secondary">
+            <?php endif; ?>
+
+            <?php if($isIT || $isHC || $isOutlet || $isManagement): ?>
+                <li class="nav-item mt-2">
+                    <small class="text-secondary fw-bold text-uppercase px-2 fs-8" style="letter-spacing: 0.5px;">HC RECRUITMENT</small>
+                </li>
+                <li>
+                    <a href="<?php echo e(route('hc.dashboard')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('hc.dashboard*') ? 'active bg-primary' : ''); ?>">
+                        <i class="bi bi-speedometer2 me-2"></i> Dashboard SLA
+                    </a>
+                </li>
+                <li>
+                    <a href="<?php echo e(route('hc.manpower.index')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('hc.manpower*') ? 'active bg-primary' : ''); ?>">
+                        <i class="bi bi-file-earmark-person me-2"></i> Manpower Request
+                    </a>
+                </li>
+                <li>
+                    <a href="<?php echo e(route('hc.vacancies.index')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('hc.vacancies*') ? 'active bg-primary' : ''); ?>">
+                        <i class="bi bi-briefcase me-2"></i> Vacancy & Pipeline
+                    </a>
+                </li>
+                <li>
+                    <a href="<?php echo e(route('hc.candidates.index')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('hc.candidates*') ? 'active bg-primary' : ''); ?>">
+                        <i class="bi bi-people me-2"></i> Candidate Database
+                    </a>
+                </li>
+                <hr class="my-2 border-secondary">
+            <?php endif; ?>
+
+            <?php if($isMaintenance): ?>
+                <li class="nav-item mt-2">
+                    <small class="text-secondary fw-bold text-uppercase px-2 fs-8">MAINTENANCE</small>
+                </li>
+                <li>
+                    <a href="<?php echo e(route('report.maintenance')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('report.maintenance*') ? 'active bg-primary' : ''); ?>">
+                        <i class="bi bi-file-earmark-text me-2"></i> Report Corrective
+                    </a>
+                </li>
+                <hr class="my-2 border-secondary">
+            <?php endif; ?>
+
+            <?php if($isIT || $isMaintenance || $isOutlet): ?>
+                <li class="nav-item mt-2">
+                    <small class="text-secondary fw-bold text-uppercase px-2 fs-8">ASSET & SUPPORT</small>
+                </li>
+                <?php if($isIT || $isMaintenance): ?>
+                <li>
+                    <a href="<?php echo e(route('assets.index')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('assets*') ? 'active bg-primary' : ''); ?>">
+                        <i class="bi bi-box-seam me-2"></i> Inventori
+                    </a>
+                </li>
+                <li>
+                    <a href="<?php echo e(route('asset-management.index')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('asset-management*') ? 'active bg-primary' : ''); ?>">
+                        <i class="bi bi-laptop me-2"></i> Asset Management
+                    </a>
+                </li>
+                <?php endif; ?>
+                <li>
+                    <a href="<?php echo e(route('tickets.index')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('tickets.index*') || request()->routeIs('tickets.show*') || request()->routeIs('tickets.create*') ? 'active bg-primary' : ''); ?>">
+                        <i class="bi bi-wrench me-2"></i> Corrective/Tiket
+                    </a>
+                </li>
+                
+                <li>
+                    <a href="<?php echo e(route('tickets.sla-dashboard')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('tickets.sla-dashboard*') ? 'active bg-primary' : ''); ?>">
+                        <i class="bi bi-bar-chart-line me-2"></i> Dashboard SLA & Trend
+                    </a>
+                </li>
+                <hr class="my-2 border-secondary">
+            <?php endif; ?>
+
+
+            <li class="nav-item mt-2">
+                <small class="text-secondary fw-bold text-uppercase px-2 fs-8">PANDUAN</small>
+            </li>
+            <li>
+                <a href="<?php echo e(route('panduan.index')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('panduan*') ? 'active bg-primary' : ''); ?>">
+                    <i class="bi bi-book me-2"></i> Panduan Penggunaan
+                </a>
+            </li>
+            <hr class="my-2 border-secondary">
+        </ul>
+        
+        <div class="mt-auto pt-3 border-top border-secondary">
+            <?php if(auth()->guard()->check()): ?>
+            <div class="d-flex align-items-center mb-3 text-white px-1">
+                <i class="bi bi-person-circle fs-2 me-2 text-light flex-shrink-0"></i>
+                <div class="lh-sm overflow-hidden w-100" style="min-width: 0;">
+                    <div class="fw-bold text-truncate fs-7" title="<?php echo e($userName); ?>">
+                        <?php echo e($userName); ?>
+
+                    </div>
+                    <div class="mt-1">
+                        <span class="badge <?php echo e($roleBadgeClass); ?> fs-8">(<?php echo e($userRole); ?>)</span>
+                    </div>
+                    <?php if($branchInfo): ?>
+                    <div class="text-secondary text-truncate fs-8 mt-1" title="<?php echo e($branchInfo); ?>">
+                        <i class="bi bi-geo-alt me-1"></i><?php echo e($branchInfo); ?>
+
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <form action="<?php echo e(route('logout')); ?>" method="POST">
+                <?php echo csrf_field(); ?>
+                <button type="submit" class="btn btn-outline-danger btn-sm w-100 d-flex align-items-center justify-content-center py-2">
+                    <i class="bi bi-box-arrow-right me-2"></i> Logout
+                </button>
+            </form>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- SIDEBAR OFFCANVAS MOBILE -->
+    <div class="offcanvas offcanvas-start bg-dark text-white d-md-none" tabindex="-1" id="sidebarMobile" aria-labelledby="sidebarMobileLabel" style="width: 280px;">
+        <div class="offcanvas-header border-bottom border-secondary">
+            <h5 class="offcanvas-title fw-bold text-primary" id="sidebarMobileLabel">PORTAL APP</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body d-flex flex-column justify-content-between p-3">
+            <ul class="nav nav-pills flex-column mb-auto">
+                <?php if($isIT): ?>
+                    <li class="nav-item mt-2"><small class="text-secondary fw-bold text-uppercase px-2 fs-8">IT</small></li>
+                    <li><a href="<?php echo e(route('users.index')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('users.index*') ? 'active bg-primary' : ''); ?>"><i class="bi bi-people me-2"></i> User Management</a></li>
+                    <li><a href="<?php echo e(route('users.roles')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('users.roles*') ? 'active bg-primary' : ''); ?>"><i class="bi bi-shield-lock me-2"></i> User Role</a></li>
+                    <li><a href="<?php echo e(route('it.checklist.create')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('it.checklist*') ? 'active bg-primary' : ''); ?>"><i class="bi bi-check2-square me-2"></i> Checklist Outlet</a></li>
+                    <li><a href="<?php echo e(route('report.it')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('report.it*') ? 'active bg-primary' : ''); ?>"><i class="bi bi-file-earmark-text me-2"></i> Report Corrective</a></li>
+                    <hr class="my-2 border-secondary">
+                <?php endif; ?>
+
+                
+                <?php if(auth()->user()->hasPermission('e-learning') || auth()->user()->hasPermission('pre-test') || auth()->user()->hasPermission('post-test')): ?>
+                    <div class="sidebar-heading">HC LEARNING</div>
+
+                    <?php if(auth()->user()->hasPermission('e-learning')): ?>
+                        <li class="nav-item">
+                            <a href="<?php echo e(route('elearning.index')); ?>" class="nav-link">
+                                <span>e-Learning</span>
+                            </a>
+                        </li>
+                    <?php endif; ?>
+
+                    <?php if(auth()->user()->hasPermission('pre-test')): ?>
+                        <li class="nav-item">
+                            <a href="<?php echo e(route('pretest.index')); ?>" class="nav-link">
+                                <span>Pre-Test</span>
+                            </a>
+                        </li>
+                    <?php endif; ?>
+
+                    <?php if(auth()->user()->hasPermission('post-test')): ?>
+                        <li class="nav-item">
+                            <a href="<?php echo e(route('posttest.index')); ?>" class="nav-link">
+                                <span>Post-Test</span>
+                            </a>
+                        </li>
+                    <?php endif; ?>
+                <?php endif; ?>
+
+                <?php if($isIT || $isHC || $isOutlet || $isManagement): ?>
+                    <li class="nav-item mt-2">
+                        <small class="text-secondary fw-bold text-uppercase px-2 fs-8" style="letter-spacing: 0.5px;">HC RECRUITMENT</small>
+                    </li>
+                    <li>
+                        <a href="<?php echo e(route('hc.dashboard')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('hc.dashboard*') ? 'active bg-primary' : ''); ?>">
+                            <i class="bi bi-speedometer2 me-2"></i> Dashboard SLA
+                        </a>
+                    </li>
+                    <li>
+                        <a href="<?php echo e(route('hc.manpower.index')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('hc.manpower*') ? 'active bg-primary' : ''); ?>">
+                            <i class="bi bi-file-earmark-person me-2"></i> Manpower Request
+                        </a>
+                    </li>
+                    <li>
+                        <a href="<?php echo e(route('hc.vacancies.index')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('hc.vacancies*') ? 'active bg-primary' : ''); ?>">
+                            <i class="bi bi-briefcase me-2"></i> Vacancy & Pipeline
+                        </a>
+                    </li>
+                    <li>
+                        <a href="<?php echo e(route('hc.candidates.index')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('hc.candidates*') ? 'active bg-primary' : ''); ?>">
+                            <i class="bi bi-people me-2"></i> Candidate Database
+                        </a>
+                    </li>
+                    <hr class="my-2 border-secondary">
+                <?php endif; ?>
+
+                <?php if($isMaintenance): ?>
+                    <li class="nav-item mt-2"><small class="text-secondary fw-bold text-uppercase px-2 fs-8">MAINTENANCE</small></li>
+                    <li><a href="<?php echo e(route('report.maintenance')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('report.maintenance*') ? 'active bg-primary' : ''); ?>"><i class="bi bi-file-earmark-text me-2"></i> Report Corrective</a></li>
+                    <hr class="my-2 border-secondary">
+                <?php endif; ?>
+
+                <?php if($isIT || $isMaintenance || $isOutlet): ?>
+                    <li class="nav-item mt-2"><small class="text-secondary fw-bold text-uppercase px-2 fs-8">ASSET & SUPPORT</small></li>
+                    <?php if($isIT || $isMaintenance): ?>
+                    <li><a href="<?php echo e(route('assets.index')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('assets*') ? 'active bg-primary' : ''); ?>"><i class="bi bi-box-seam me-2"></i> Inventori</a></li>
+                    <li><a href="<?php echo e(route('asset-management.index')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('asset-management*') ? 'active bg-primary' : ''); ?>"><i class="bi bi-laptop me-2"></i> Asset Management</a></li>
+                    <?php endif; ?>
+                    <li><a href="<?php echo e(route('tickets.index')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('tickets.index*') || request()->routeIs('tickets.show*') || request()->routeIs('tickets.create*') ? 'active bg-primary' : ''); ?>"><i class="bi bi-wrench me-2"></i> Corrective/Tiket</a></li>
+                    <li><a href="<?php echo e(route('tickets.sla-dashboard')); ?>" class="nav-link text-white <?php echo e(request()->routeIs('tickets.sla-dashboard*') ? 'active bg-primary' : ''); ?>"><i class="bi bi-bar-chart-line me-2"></i> Dashboard SLA & Trend</a></li>
+                    <hr class="my-2 border-secondary">
+                <?php endif; ?>
+
+                
+                <?php if(auth()->user()->hasPermission('panduan-penggunaan')): ?>
+                    <li class="nav-item">
+                        <a href="<?php echo e(route('panduan.index')); ?>" class="nav-link">
+                            <i class="fas fa-book"></i>
+                            <span>Panduan Penggunaan</span>
+                        </a>
+                    </li>
+                <?php endif; ?>
+            </ul>
+            
+            <div class="mt-4 pt-3 border-top border-secondary">
+                <?php if(auth()->guard()->check()): ?>
+                <div class="d-flex align-items-center mb-3 text-white px-1">
+                    <i class="bi bi-person-circle fs-2 me-2 text-light flex-shrink-0"></i>
+                    <div class="lh-sm overflow-hidden w-100" style="min-width: 0;">
+                        <div class="fw-bold text-truncate fs-7" title="<?php echo e($userName); ?>"><?php echo e($userName); ?></div>
+                        <div class="mt-1"><span class="badge <?php echo e($roleBadgeClass); ?> fs-8">(<?php echo e($userRole); ?>)</span></div>
+                        <?php if($branchInfo): ?>
+                        <div class="text-secondary text-truncate fs-8 mt-1" title="<?php echo e($branchInfo); ?>"><i class="bi bi-geo-alt me-1"></i><?php echo e($branchInfo); ?></div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <form action="<?php echo e(route('logout')); ?>" method="POST">
+                    <?php echo csrf_field(); ?>
+                    <button type="submit" class="btn btn-outline-danger btn-sm w-100 d-flex align-items-center justify-content-center py-2">
+                        <i class="bi bi-box-arrow-right me-2"></i> Logout
+                    </button>
+                </form>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <div class="flex-grow-1 p-3 p-md-4 overflow-auto" style="min-width: 0;">
+        <?php if(session('success')): ?>
+            <div class="alert alert-success alert-dismissible fade show py-2 px-3 fs-7" role="alert">
+                <?php echo e(session('success')); ?>
+
+                <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        <?php endif; ?>
+        <?php if(session('error')): ?>
+            <div class="alert alert-danger alert-dismissible fade show py-2 px-3 fs-7" role="alert">
+                <?php echo e(session('error')); ?>
+
+                <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        <?php endif; ?>
+        
+        <?php echo $__env->yieldContent('content'); ?>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<?php echo $__env->make('layouts.footer', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+</body>
+</html><?php /**PATH D:\hans\1\portal\resources\views/layouts/app.blade.php ENDPATH**/ ?>

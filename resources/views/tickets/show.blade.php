@@ -66,25 +66,30 @@
                 <textarea class="form-control bg-light" rows="3" readonly>{{ $ticket->description }}</textarea>
             </div>
 
-            {{-- BAGIAN LAMPIRAN FOTO TIKET --}}
-            @php
-                $ticketPhoto = $ticket->attachment ?? $ticket->image ?? $ticket->photo ?? $ticket->file ?? null;
-            @endphp
-
+            {{-- BAGIAN LAMPIRAN FOTO TIKET (Menggunakan Route View Attachment) --}}
             <div class="mb-2">
                 <label class="form-label fw-bold mb-1">Lampiran / Foto Kerusakan:</label>
                 <div>
+                    @php
+                        $ticketPhoto = $ticket->attachment ?? $ticket->image ?? $ticket->photo ?? $ticket->file ?? null;
+                        $photoUrl = null;
+
+                        if ($ticketPhoto) {
+                            if (Str::startsWith($ticketPhoto, 'http')) {
+                                $photoUrl = $ticketPhoto;
+                            } else {
+                                $photoUrl = route('view.attachment', ['path' => ltrim($ticketPhoto, '/')]);
+                            }
+                        }
+                    @endphp
+
                     @if($ticketPhoto)
-                        @php
-                            $photoUrl = Str::startsWith($ticketPhoto, 'http') 
-                                ? $ticketPhoto 
-                                : asset('storage/' . $ticketPhoto);
-                        @endphp
                         <div class="d-inline-block position-relative">
                             <a href="{{ $photoUrl }}" target="_blank">
                                 <img src="{{ $photoUrl }}" alt="Foto Kerusakan" class="img-thumbnail rounded shadow-sm" style="max-height: 250px; object-fit: cover;">
                             </a>
                             <div class="mt-1 small text-muted">
+                                <span class="text-secondary" style="font-size: 0.75rem;">Path DB: {{ $ticketPhoto }}</span><br>
                                 <i class="bi bi-zoom-in me-1"></i>Klik gambar untuk memperbesar
                             </div>
                         </div>
@@ -181,20 +186,26 @@
                 {{-- SECTION LAMPIRAN FOTO BAST & TANDA TANGAN DIGITAL --}}
                 <div class="col-12 mt-3 pt-3 border-top">
                     <div class="row g-3">
-                        {{-- Foto Bukti Perbaikan BAST --}}
+                        {{-- Foto Bukti Perbaikan BAST (Menggunakan Route View Attachment) --}}
                         <div class="col-md-6">
                             <label class="form-label small fw-bold text-muted mb-2">Lampiran Foto / Bukti Perbaikan:</label>
                             @php
                                 $bastPhoto = $ticket->bast->documentation ?? $ticket->bast->attachment ?? $ticket->bast->photo ?? $ticket->bast->image ?? null;
+                                $bastUrl = null;
+
+                                if ($bastPhoto) {
+                                    if (Str::startsWith($bastPhoto, 'http')) {
+                                        $bastUrl = $bastPhoto;
+                                    } else {
+                                        $bastUrl = route('view.attachment', ['path' => ltrim($bastPhoto, '/')]);
+                                    }
+                                }
                             @endphp
                             <div>
                                 @if($bastPhoto)
-                                    @php
-                                        $bastPhotoUrl = Str::startsWith($bastPhoto, 'http') ? $bastPhoto : asset('storage/' . $bastPhoto);
-                                    @endphp
                                     <div class="d-inline-block">
-                                        <a href="{{ $bastPhotoUrl }}" target="_blank">
-                                            <img src="{{ $bastPhotoUrl }}" alt="Foto BAST" class="img-thumbnail rounded shadow-sm" style="max-height: 180px; object-fit: cover;">
+                                        <a href="{{ $bastUrl }}" target="_blank">
+                                            <img src="{{ $bastUrl }}" alt="Foto BAST" class="img-thumbnail rounded shadow-sm" style="max-height: 180px; object-fit: cover;">
                                         </a>
                                         <div class="mt-1 small text-muted"><i class="bi bi-zoom-in me-1"></i>Klik gambar untuk memperbesar</div>
                                     </div>

@@ -80,11 +80,10 @@
         </div>
     </div>
 
-    <!-- Baris Kedua: Berdasarkan Prioritas, Resolution Code, dan SLA Closure (Donut/Pie) -->
+    <!-- Baris Kedua: Berdasarkan Prioritas dan SLA Closure (Donut/Pie) -->
     <div class="row g-4">
-        <!-- Kolom Kiri: Prioritas & Top Resolution Code -->
+        <!-- Kolom Kiri: Prioritas Tiket -->
         <div class="col-lg-5">
-            <!-- Berdasarkan Prioritas & Departemen -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
                     <h5 class="mb-0 fw-bold fs-6">Prioritas Tiket</h5>
@@ -117,33 +116,6 @@
                         <span><i class="bi bi-square-fill text-warning"></i> Sedang</span>
                         <span><i class="bi bi-square-fill text-danger"></i> Tinggi</span>
                     </div>
-                </div>
-            </div>
-
-            <!-- Top 5 Resolution Code - Incident -->
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3">
-                    <h5 class="mb-0 fw-bold fs-6">Top 5 Resolution Code - Incident</h5>
-                </div>
-                <div class="card-body">
-                    <ul class="list-unstyled mb-0 small">
-                        <li class="mb-2">
-                            <div class="d-flex justify-content-between mb-1"><span class="fw-bold">CONFIGURATION</span> <span>1,935</span></div>
-                            <div class="progress" style="height: 6px;"><div class="progress-bar bg-primary" style="width: 90%;"></div></div>
-                        </li>
-                        <li class="mb-2">
-                            <div class="d-flex justify-content-between mb-1"><span class="fw-bold">NO ACTION TAKEN</span> <span>712</span></div>
-                            <div class="progress" style="height: 6px;"><div class="progress-bar bg-primary" style="width: 45%;"></div></div>
-                        </li>
-                        <li class="mb-2">
-                            <div class="d-flex justify-content-between mb-1"><span class="fw-bold">SECURITY PWR REBOOT</span> <span>257</span></div>
-                            <div class="progress" style="height: 6px;"><div class="progress-bar bg-primary" style="width: 20%;"></div></div>
-                        </li>
-                        <li>
-                            <div class="d-flex justify-content-between mb-1"><span class="fw-bold">SECURITY ACCESS FIX</span> <span>249</span></div>
-                            <div class="progress" style="height: 6px;"><div class="progress-bar bg-primary" style="width: 18%;"></div></div>
-                        </li>
-                    </ul>
                 </div>
             </div>
         </div>
@@ -204,7 +176,7 @@
             datasets: [{
                 label: 'IT',
                 data: [187, 174, 191, 180, 145, 170, 148, 200, 166, 212, 197, 16],
-                borderColor: '#0d6efd', // Warna Biru untuk IT
+                borderColor: '#0d6efd',
                 backgroundColor: 'rgba(13, 110, 253, 0.1)',
                 borderWidth: 2,
                 tension: 0.2,
@@ -212,7 +184,7 @@
             }, {
                 label: 'MAINTENANCE',
                 data: [127, 205, 30, 129, 6, 109, 8, 147, 11, 247, 141, 9],
-                borderColor: '#198754', // Warna Hijau untuk Maintenance
+                borderColor: '#198754',
                 backgroundColor: 'rgba(25, 135, 84, 0.1)',
                 borderWidth: 2,
                 tension: 0.2,

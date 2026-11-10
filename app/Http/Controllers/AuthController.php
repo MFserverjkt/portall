@@ -24,13 +24,8 @@ class AuthController extends Controller
 
             $user = Auth::user();
 
-            // 3. Redirect berdasarkan Role (Opsional jika halaman awal beda)
-            if (strtoupper($user->role) === 'OUTLET') {
-                return redirect()->route('tickets.index');
-            }
-
-            // Default redirect untuk Admin / IT / Maintenance
-            return redirect()->route('tickets.index'); 
+            // 3. Redirect semua role langsung menuju Dashboard SLA
+            return redirect()->route('tickets.sla-dashboard');
         }
 
         // 4. Jika gagal login

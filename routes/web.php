@@ -1,6 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\Request;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AssetController;
@@ -78,6 +80,18 @@ Route::post('/telegram/webhook', function () {
 // 3. Protected Routes (Wajib Login)
 Route::middleware(['auth'])->group(function () {
 
+    // --- ROUTE AMAN STREAMING LAMPIRAN STORAGE (BEBAS 403 & 404) ---
+    Route::get('/view-attachment', function (Request $request) {
+        $path = $request->query('path');
+        $fullPath = storage_path('app/public/' . $path);
+        
+        if (!$path || !file_exists($fullPath)) {
+            abort(404, 'File lampiran tidak ditemukan.');
+        }
+        
+        return response()->file($fullPath);
+    })->name('view.attachment');
+
     // --- FITUR PANDUAN / GUIDANCE (SEMUA ROLE) ---
     Route::get('guidance', [GuidanceController::class, 'index'])->name('guidance.index');
     Route::get('panduan', [GuidanceController::class, 'index'])->name('panduan.index');
@@ -87,8 +101,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('asset-management/{id}/user-history', [AssetManagementController::class, 'storeUserHistory'])->name('asset-management.user-history.store');
     Route::post('asset-management/{id}/maintenance-history', [AssetManagementController::class, 'storeMaintenanceHistory'])->name('asset-management.maintenance-history.store');
 
-    // --- FITUR ADMIN & IT (USER, ROLE MANAGEMENT, EXPORT EXCEL & CHECKLIST OUTLET) ---
-    Route::middleware(['role:ADMIN,IT'])->group(function () {
+    // --- FITUR ADMIN, IT & MAINTENANCE (USER, ROLE MANAGEMENT, EXPORT EXCEL & CHECKLIST OUTLET) ---
+    Route::middleware(['role:ADMIN,IT,MAINTENANCE'])->group(function () {
         Route::controller(UserController::class)->group(function () {
             Route::get('users/export', 'exportExcel')->name('users.export');
             Route::get('user-roles', 'roles')->name('users.roles');
