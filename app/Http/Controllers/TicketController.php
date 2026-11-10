@@ -15,75 +15,75 @@ use Carbon\Carbon;
 class TicketController extends Controller
 {
     public function index(Request $request)
-{
-    $user = auth()->user();
-    $selectedBranch = $request->input('branch');
-    $selectedStatus = $request->input('status');
+    {
+        $user = auth()->user();
+        $selectedBranch = $request->input('branch');
+        $selectedStatus = $request->input('status');
 
-    $query = Ticket::with(['asset', 'user', 'bast'])->latest();
+        $query = Ticket::with(['asset', 'user', 'bast'])->latest();
 
-    if ($user->role === 'OUTLET') {
-        $userBranch = trim($user->branch_code ?? '');
-        $query->where(function ($q) use ($user, $userBranch) {
-            $q->where('user_id', $user->id);
-            if (!empty($userBranch)) {
-                $q->orWhere(function ($sub) use ($userBranch) {
-                    $sub->whereNotNull('branch_code')
-                        ->where('branch_code', '!=', '')
-                        ->where('branch_code', $userBranch);
-                });
-            }
-        });
-    } elseif ($user->role === 'IT') {
-        // Role IT dapat melihat tiket departemen IT DAN MAINTENANCE
-        $query->whereIn('department', ['IT', 'MAINTENANCE']);
-    } elseif ($user->role === 'MAINTENANCE') {
-        // Role MAINTENANCE hanya dapat melihat tiket departemen MAINTENANCE saja
-        $query->where('department', 'MAINTENANCE');
+        if ($user->role === 'OUTLET') {
+            $userBranch = trim($user->branch_code ?? '');
+            $query->where(function ($q) use ($user, $userBranch) {
+                $q->where('user_id', $user->id);
+                if (!empty($userBranch)) {
+                    $q->orWhere(function ($sub) use ($userBranch) {
+                        $sub->whereNotNull('branch_code')
+                            ->where('branch_code', '!=', '')
+                            ->where('branch_code', $userBranch);
+                    });
+                }
+            });
+        } elseif ($user->role === 'IT') {
+            // Role IT dapat melihat tiket departemen IT DAN MAINTENANCE
+            $query->whereIn('department', ['IT', 'MAINTENANCE']);
+        } elseif ($user->role === 'MAINTENANCE') {
+            // Role MAINTENANCE hanya dapat melihat tiket departemen MAINTENANCE saja
+            $query->where('department', 'MAINTENANCE');
+        }
+        // Jika ADMIN, tidak perlu pembatasan departemen (bisa melihat semua)
+
+        if (!empty($selectedBranch)) {
+            $query->where(function ($q) use ($selectedBranch) {
+                $q->where('branch_code', $selectedBranch)
+                  ->orWhere('branch_name', $selectedBranch)
+                  ->orWhereHas('user', function ($subQuery) use ($selectedBranch) {
+                      $subQuery->where('branch_code', $selectedBranch)
+                               ->orWhere('branch_name', $selectedBranch);
+                  });
+            });
+        }
+
+        if (!empty($selectedStatus)) {
+            $query->where(function ($q) use ($selectedStatus) {
+                if ($selectedStatus === 'Menunggu Konfirmasi') {
+                    $q->where('status', 'Menunggu Konfirmasi');
+                } elseif ($selectedStatus === 'Completed') {
+                    $q->where(function ($sub) {
+                        $sub->whereIn('status', ['Selesai', 'Completed'])
+                            ->orWhere('work_status', 'Completed');
+                    })->where('status', '!=', 'Menunggu Konfirmasi');
+                } else {
+                    $q->where('status', $selectedStatus)
+                      ->orWhere('work_status', $selectedStatus);
+                }
+            });
+        }
+
+        $tickets = $query->get();
+
+        $branchCodes = User::whereNotNull('branch_code')->pluck('branch_code');
+        $assetBranches = Asset::whereNotNull('branch_code')->pluck('branch_code');
+
+        $branches = $branchCodes
+            ->merge($assetBranches)
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
+        return view('tickets.index', compact('tickets', 'branches'));
     }
-    // Jika ADMIN, tidak perlu pembatasan departemen (bisa melihat semua)
-
-    if (!empty($selectedBranch)) {
-        $query->where(function ($q) use ($selectedBranch) {
-            $q->where('branch_code', $selectedBranch)
-              ->orWhere('branch_name', $selectedBranch)
-              ->orWhereHas('user', function ($subQuery) use ($selectedBranch) {
-                  $subQuery->where('branch_code', $selectedBranch)
-                           ->orWhere('branch_name', $selectedBranch);
-              });
-        });
-    }
-
-    if (!empty($selectedStatus)) {
-        $query->where(function ($q) use ($selectedStatus) {
-            if ($selectedStatus === 'Menunggu Konfirmasi') {
-                $q->where('status', 'Menunggu Konfirmasi');
-            } elseif ($selectedStatus === 'Completed') {
-                $q->where(function ($sub) {
-                    $sub->whereIn('status', ['Selesai', 'Completed'])
-                        ->orWhere('work_status', 'Completed');
-                })->where('status', '!=', 'Menunggu Konfirmasi');
-            } else {
-                $q->where('status', $selectedStatus)
-                  ->orWhere('work_status', $selectedStatus);
-            }
-        });
-    }
-
-    $tickets = $query->get();
-
-    $branchCodes = User::whereNotNull('branch_code')->pluck('branch_code');
-    $assetBranches = Asset::whereNotNull('branch_code')->pluck('branch_code');
-
-    $branches = $branchCodes
-        ->merge($assetBranches)
-        ->filter()
-        ->unique()
-        ->sort()
-        ->values();
-
-    return view('tickets.index', compact('tickets', 'branches'));
-}
 
     public function create()
     {
@@ -128,8 +128,8 @@ class TicketController extends Controller
 
         $attachmentPath = null;
         if ($request->hasFile('attachment')) {
-            // Memastikan file tersimpan secara eksplisit ke disk public di dalam folder tickets/attachments
-            $attachmentPath = $request->file('attachment')->store('tickets/attachments', 'public');
+            // Disimpan ke folder eksternal melalui disk external_uploads
+            $attachmentPath = $request->file('attachment')->store('tickets/attachments', 'external_uploads');
         }
 
         $branchCode = $request->filled('branch_code') 
@@ -178,7 +178,7 @@ class TicketController extends Controller
             $message .= "<i>Silakan login ke portal untuk memproses tiket ini.</i>";
 
             if ($attachmentPath && in_array(pathinfo($attachmentPath, PATHINFO_EXTENSION), ['jpg', 'jpeg', 'png'])) {
-                $fullPhotoPath = storage_path('app/public/' . $attachmentPath);
+                $fullPhotoPath = 'C:\Users\USER\Documents\IT\ngrok-v3-stable-windows-386\lampiran-portal\\' . $attachmentPath;
                 if (file_exists($fullPhotoPath)) {
                     $telegram->sendPhoto($fullPhotoPath, $message, $division);
                 } else {
@@ -210,12 +210,12 @@ class TicketController extends Controller
 
         $ticket = Ticket::with(['bast', 'asset'])->findOrFail($id);
 
-        if ($ticket->attachment && Storage::disk('public')->exists($ticket->attachment)) {
-            Storage::disk('public')->delete($ticket->attachment);
+        if ($ticket->attachment && Storage::disk('external_uploads')->exists($ticket->attachment)) {
+            Storage::disk('external_uploads')->delete($ticket->attachment);
         }
 
-        if ($ticket->bast && $ticket->bast->attachment && Storage::disk('public')->exists($ticket->bast->attachment)) {
-            Storage::disk('public')->delete($ticket->bast->attachment);
+        if ($ticket->bast && $ticket->bast->attachment && Storage::disk('external_uploads')->exists($ticket->bast->attachment)) {
+            Storage::disk('external_uploads')->delete($ticket->bast->attachment);
         }
 
         if ($ticket->bast) {
@@ -273,11 +273,11 @@ class TicketController extends Controller
 
         $attachmentPath = optional($ticket->bast)->attachment ?? null;
         if ($request->hasFile('attachment')) {
-            if ($attachmentPath && Storage::disk('public')->exists($attachmentPath)) {
-                Storage::disk('public')->delete($attachmentPath);
+            if ($attachmentPath && Storage::disk('external_uploads')->exists($attachmentPath)) {
+                Storage::disk('external_uploads')->delete($attachmentPath);
             }
-            // Menyimpan file BAST secara eksplisit ke dalam folder basts
-            $attachmentPath = $request->file('attachment')->store('basts', 'public');
+            // Menyimpan file BAST ke disk eksternal
+            $attachmentPath = $request->file('attachment')->store('basts', 'external_uploads');
         }
 
         $ticket->bast()->updateOrCreate(
@@ -310,7 +310,7 @@ class TicketController extends Controller
             $message .= "<i>Silakan login ke portal untuk melakukan konfirmasi penyelesaian.</i>";
 
             if ($attachmentPath && in_array(pathinfo($attachmentPath, PATHINFO_EXTENSION), ['jpg', 'jpeg', 'png'])) {
-                $fullPhotoPath = storage_path('app/public/' . $attachmentPath);
+                $fullPhotoPath = 'C:\Users\USER\Documents\IT\ngrok-v3-stable-windows-386\lampiran-portal\\' . $attachmentPath;
                 if (file_exists($fullPhotoPath)) {
                     $telegram->sendPhoto($fullPhotoPath, $message, $division);
                 } else {

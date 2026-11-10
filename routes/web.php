@@ -80,10 +80,11 @@ Route::post('/telegram/webhook', function () {
 // 3. Protected Routes (Wajib Login)
 Route::middleware(['auth'])->group(function () {
 
-    // --- ROUTE AMAN STREAMING LAMPIRAN STORAGE (BEBAS 403 & 404) ---
+    // --- ROUTE AMAN STREAMING LAMPIRAN STORAGE EXTERNAL (BEBAS 403 & 404) ---
     Route::get('/view-attachment', function (Request $request) {
         $path = $request->query('path');
-        $fullPath = storage_path('app/public/' . $path);
+        // Mengarahkan jalur pembacaan file ke direktori eksternal di Windows Documents
+        $fullPath = 'C:\Users\USER\Documents\IT\ngrok-v3-stable-windows-386\lampiran-portal\\' . $path;
         
         if (!$path || !file_exists($fullPath)) {
             abort(404, 'File lampiran tidak ditemukan.');

@@ -47,6 +47,15 @@ return [
             'report' => false,
         ],
 
+        // --- TAMBAHAN DISK EXTERNAL UNTUK FOLDER DILUAR PROJECT ---
+        'external_uploads' => [
+            'driver' => 'local',
+            'root' => 'C:\Users\USER\Documents\IT\ngrok-v3-stable-windows-386\lampiran-portal',
+            'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
