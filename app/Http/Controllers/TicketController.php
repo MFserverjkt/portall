@@ -127,9 +127,25 @@ class TicketController extends Controller
         $user  = auth()->user();
 
         $attachmentPath = null;
+        
+        // --- PROSES UPLOAD LANGSUNG KE FOLDER EKSTERNAL WINDOWS ---
         if ($request->hasFile('attachment')) {
-            // Disimpan ke folder eksternal melalui disk external_uploads
-            $attachmentPath = $request->file('attachment')->store('tickets/attachments', 'external_uploads');
+            $file = $request->file('attachment');
+            $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+            
+            // Tentukan folder tujuan fisik di luar project
+            $destinationPath = 'C:\Users\USER\Documents\IT\ngrok-v3-stable-windows-386\lampiran-portal\tickets\attachments';
+            
+            // Buat foldernya secara otomatis jika belum ada
+            if (!file_exists($destinationPath)) {
+                mkdir($destinationPath, 0777, true);
+            }
+            
+            // Pindahkan file langsung ke folder tujuan eksternal
+            $file->move($destinationPath, $filename);
+            
+            // Simpan relative path untuk kebutuhan database & view attachment
+            $attachmentPath = 'tickets/attachments/' . $filename;
         }
 
         $branchCode = $request->filled('branch_code') 
