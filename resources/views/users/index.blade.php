@@ -12,13 +12,15 @@
         </a>
     </div>
 
-    <!-- Filter Branch -->
+    <!-- Filter Manual (Cabang & Role) -->
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
-            <form action="{{ route('users.index') }}" method="GET" class="row g-3 align-items-center">
-                <div class="col-md-6">
+            <form action="{{ route('users.index') }}" method="GET" class="row g-3 align-items-end">
+                
+                <!-- Filter Cabang / Outlet -->
+                <div class="col-md-5">
                     <label class="form-label small fw-bold">Filter Cabang / Outlet</label>
-                    <select name="branch" class="form-select" onchange="this.form.submit()">
+                    <select name="branch" class="form-select">
                         <option value="">-- Semua Cabang --</option>
                         @foreach($branches as $code => $name)
                             <option value="{{ $code }}" {{ request('branch') == $code ? 'selected' : '' }}>
@@ -27,11 +29,32 @@
                         @endforeach
                     </select>
                 </div>
-                @if(request('branch'))
-                    <div class="col-md-2 align-self-end">
-                        <a href="{{ route('users.index') }}" class="btn btn-outline-secondary w-100">Reset Filter</a>
-                    </div>
-                @endif
+
+                <!-- Filter Role -->
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold">Filter Role</label>
+                    <select name="role" class="form-select">
+                        <option value="">-- Semua Role --</option>
+                        @foreach($roles ?? [] as $r)
+                            <option value="{{ $r }}" {{ request('role') == $r ? 'selected' : '' }}>
+                                {{ $r }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Tombol Aksi Filter -->
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary me-1">
+                        <i class="bi bi-filter"></i> Filter
+                    </button>
+                    @if(request('branch') || request('role'))
+                        <a href="{{ route('users.index') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-sync"></i> Reset
+                        </a>
+                    @endif
+                </div>
+
             </form>
         </div>
     </div>
@@ -45,7 +68,7 @@
                         <tr>
                             <th>#</th>
                             <th>Nama User</th>
-                            <th>Email</th>
+                            <th>Username</th>
                             <th>Role</th>
                             <th>Cabang / Outlet</th>
                             <th class="text-center">Aksi</th>
@@ -54,11 +77,11 @@
                     <tbody>
                         @forelse($users as $user)
                             <tr>
-                                <td>{{ $loop->iteration }}</td>
+                                <td>{{ method_exists($users, 'firstItem') ? $users->firstItem() + $loop->index : $loop->iteration }}</td>
                                 <td class="fw-semibold">{{ $user->name }}</td>
-                                <td>{{ $user->email }}</td>
+                                <td>{{ $user->username }}</td>
                                 <td>
-                                    <span class="badge bg-{{ $user->role === 'ADMIN' ? 'danger' : ($user->role === 'IT' ? 'info text-dark' : 'secondary') }}">
+                                    <span class="badge bg-{{ $user->role === 'ADMIN' ? 'danger' : ($user->role === 'IT' ? 'info text-dark' : ($user->role === 'MAINTENANCE' ? 'warning text-dark' : 'secondary')) }}">
                                         {{ $user->role }}
                                     </span>
                                 </td>
@@ -87,6 +110,13 @@
                 </table>
             </div>
         </div>
+        
+        <!-- Pagination Links -->
+        @if(method_exists($users, 'hasPages') && $users->hasPages())
+            <div class="card-footer bg-white py-3">
+                {{ $users->withQueryString()->links() }}
+            </div>
+        @endif
     </div>
 </div>
 @endsection

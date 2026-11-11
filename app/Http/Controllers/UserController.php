@@ -37,19 +37,36 @@ class UserController extends Controller
         'MFWCT'  => 'Maison Feerie - World Capital Tower',
     ];
 
-    // Method/fungsi index untuk menampilkan daftar user (dengan dukungan filter Branch)
+    // Method/fungsi index untuk menampilkan daftar user (dengan dukungan filter Branch & Role)
     public function index(Request $request)
     {
+        $selectedBranch = $request->input('branch');
+        $selectedRole   = $request->input('role');
+
         $query = User::query();
 
-        if ($request->filled('branch')) {
-            $query->where('branch_code', $request->branch);
+        // Filter berdasarkan Branch / Cabang jika dipilih
+        if (!empty($selectedBranch)) {
+            $query->where(function ($q) use ($selectedBranch) {
+                $q->where('branch_code', $selectedBranch)
+                  ->orWhere('branch_name', $selectedBranch);
+            });
         }
 
-        $users = $query->latest()->paginate(10);
+        // Filter berdasarkan Role jika dipilih
+        if (!empty($selectedRole)) {
+            $query->where('role', $selectedRole);
+        }
+
+        $users = $query->latest()->paginate(10)->withQueryString();
         $branches = $this->branches;
 
-        return view('users.index', compact('users', 'branches'));
+        // Ambil daftar role dinamis untuk pilihan dropdown filter
+        $roles = Schema::hasTable('roles') 
+            ? DB::table('roles')->pluck('name')->toArray() 
+            : ['ADMIN', 'IT', 'MAINTENANCE', 'OUTLET', 'HC', 'ASSET'];
+
+        return view('users.index', compact('users', 'branches', 'roles', 'selectedBranch', 'selectedRole'));
     }
 
     public function create()
